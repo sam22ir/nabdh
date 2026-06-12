@@ -460,7 +460,7 @@ export default function BookingDateTimeScreen() {
   const handleNext = useCallback(() => {
     if (!selectedSlot || !doctorId || !clinicId) return;
     router.push({
-      pathname: '/(patient)/booking/confirm',
+      pathname: '/(patient)/booking/profile',
       params: {
         doctorId,
         clinicId,

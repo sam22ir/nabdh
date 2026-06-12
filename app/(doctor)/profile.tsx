@@ -24,6 +24,7 @@ import { useMutation, useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { theme } from '@/lib/theme';
 import { rtlTextAlign } from '@/lib/rtl';
+import { getArabicErrorMessage } from '@/lib/errorMessages';
 import type { Id } from '@/convex/_generated/dataModel';
 
 // =============================================================================
@@ -42,6 +43,18 @@ const LANGUAGES_OPTIONS: Array<{ label: string; value: string }> = [
 ];
 
 type SpecialtyOption = { id: Id<'specialties'>; nameAr: string; nameFr: string };
+
+interface ClinicInfo {
+  _id: Id<'clinics'>;
+  name: string;
+  wilayaId: Id<'wilayas'>;
+  communeId: Id<'communes'>;
+  address: string;
+  latitude: number;
+  longitude: number;
+  phone: string;
+  isActive: boolean;
+}
 
 interface DoctorProfileData {
   specialtyId: Id<'specialties'>;
@@ -63,6 +76,7 @@ interface DoctorProfileData {
     nameAr: string;
     nameFr: string;
   };
+  clinics: ClinicInfo[];
 }
 
 // =============================================================================
@@ -379,19 +393,75 @@ const LanguageChips: React.FC<LanguageChipsProps> = ({
   </View>
 );
 
-// ── Clinics Card (Placeholder) ──────────────────────────────────────────────
+// ── Clinics Manager ─────────────────────────────────────────────────────────
 
-const ClinicsPlaceholder: React.FC = () => (
-  <View style={styles.clinicsPlaceholder}>
-    <Ionicons name="business-outline" size={48} color={theme.colors.textSecondary} />
-    <Text style={styles.clinicsPlaceholderTitle}>إدارة العيادات</Text>
-    <Text style={styles.clinicsPlaceholderSubtitle}>
-      ستتمكن قريباً من إضافة وتعديل وحذف عياداتك
-    </Text>
-    <View style={styles.clinicsPlaceholderBadge}>
-      <Ionicons name="time-outline" size={14} color={theme.colors.primary} />
-      <Text style={styles.clinicsPlaceholderBadgeText}>قريباً</Text>
-    </View>
+interface ClinicsManagerProps {
+  clinics: ClinicInfo[];
+  onAdd: () => void;
+  onEdit: (clinic: ClinicInfo) => void;
+  onDeactivate: (clinicId: Id<'clinics'>) => void;
+}
+
+const ClinicsManager: React.FC<ClinicsManagerProps> = ({
+  clinics,
+  onAdd,
+  onEdit,
+  onDeactivate,
+}) => (
+  <View style={styles.clinicsManager}>
+    {clinics.length === 0 ? (
+      <View style={styles.emptyClinicsBox}>
+        <Ionicons name="business-outline" size={38} color={theme.colors.textSecondary} />
+        <Text style={styles.emptyClinicsText}>لا توجد عيادات مضافة</Text>
+      </View>
+    ) : (
+      clinics.map((clinic) => (
+        <View key={clinic._id} style={styles.clinicManageCard}>
+          <View style={styles.clinicManageInfo}>
+            <Text style={styles.clinicManageName}>{clinic.name}</Text>
+            <Text style={styles.clinicManageDetail}>{clinic.address}</Text>
+            <Text style={styles.clinicManageDetail}>{clinic.phone}</Text>
+          </View>
+          <View style={styles.clinicManageActions}>
+            <Pressable
+              style={({ pressed }) => [
+                styles.clinicEditButton,
+                pressed && styles.chipPressed,
+              ]}
+              onPress={() => onEdit(clinic)}
+              accessibilityRole="button"
+              accessibilityLabel={`تعديل عيادة ${clinic.name}`}
+            >
+              <Ionicons name="create-outline" size={16} color={theme.colors.primary} />
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [
+                styles.clinicDeactivateButton,
+                pressed && styles.chipPressed,
+              ]}
+              onPress={() => onDeactivate(clinic._id)}
+              accessibilityRole="button"
+              accessibilityLabel={`تعطيل عيادة ${clinic.name}`}
+            >
+              <Ionicons name="trash-outline" size={16} color={theme.colors.danger} />
+            </Pressable>
+          </View>
+        </View>
+      ))
+    )}
+
+    <Pressable
+      style={({ pressed }) => [
+        styles.addClinicButton,
+        pressed && styles.chipPressed,
+      ]}
+      onPress={onAdd}
+      accessibilityRole="button"
+      accessibilityLabel="إضافة عيادة"
+    >
+      <Ionicons name="add-circle-outline" size={18} color={theme.colors.primary} />
+      <Text style={styles.addClinicButtonText}>إضافة عيادة</Text>
+    </Pressable>
   </View>
 );
 
@@ -430,7 +500,11 @@ export default function DoctorProfileScreen() {
     | DoctorProfileData
     | null
     | undefined;
+  const wilayas = useQuery(api.locations.listWilayas, {}) ?? [];
   const updateProfile = useMutation(api.doctors.updateProfile);
+  const createClinic = useMutation(api.clinics.create);
+  const updateClinic = useMutation(api.clinics.update);
+  const deactivateClinic = useMutation(api.clinics.delete_);
 
   // ── Form ──────────────────────────────────────────────────────────────────
   const {
@@ -451,6 +525,21 @@ export default function DoctorProfileScreen() {
   // ── Local state ───────────────────────────────────────────────────────────
   const [toastVisible, setToastVisible] = useState(false);
   const [specialtyPickerVisible, setSpecialtyPickerVisible] = useState(false);
+  const [clinicModalVisible, setClinicModalVisible] = useState(false);
+  const [clinicName, setClinicName] = useState('');
+  const [clinicAddress, setClinicAddress] = useState('');
+  const [clinicPhone, setClinicPhone] = useState('');
+  const [clinicLatitude, setClinicLatitude] = useState('');
+  const [clinicLongitude, setClinicLongitude] = useState('');
+  const [clinicWilayaId, setClinicWilayaId] = useState<Id<'wilayas'> | null>(null);
+  const [clinicCommuneId, setClinicCommuneId] = useState<Id<'communes'> | null>(null);
+  const [editingClinicId, setEditingClinicId] = useState<Id<'clinics'> | null>(null);
+  const [clinicSaving, setClinicSaving] = useState(false);
+  const [clinicError, setClinicError] = useState<string | null>(null);
+  const communes = useQuery(
+    api.locations.listCommunesByWilaya,
+    clinicWilayaId ? { wilayaId: clinicWilayaId } : 'skip',
+  ) ?? [];
 
   // ── Derived ───────────────────────────────────────────────────────────────
   const specialtyOptions = useMemo<SpecialtyOption[]>(() => {
@@ -467,6 +556,11 @@ export default function DoctorProfileScreen() {
   const selectedSpecialty = useMemo(
     () => specialtyOptions.find((s) => s.id === watchedSpecialtyId),
     [specialtyOptions, watchedSpecialtyId],
+  );
+
+  const activeClinics = useMemo(
+    () => (profile?.clinics ?? []).filter((clinic) => clinic.isActive),
+    [profile?.clinics],
   );
 
   useEffect(() => {
@@ -513,6 +607,102 @@ export default function DoctorProfileScreen() {
       showToast();
     },
     [showToast, updateProfile],
+  );
+
+  const handleOpenClinicModal = useCallback(() => {
+    setEditingClinicId(null);
+    setClinicName('');
+    setClinicAddress('');
+    setClinicPhone('');
+    setClinicLatitude('');
+    setClinicLongitude('');
+    setClinicWilayaId(null);
+    setClinicCommuneId(null);
+    setClinicError(null);
+    setClinicModalVisible(true);
+  }, []);
+
+  const handleEditClinic = useCallback((clinic: ClinicInfo) => {
+    setEditingClinicId(clinic._id);
+    setClinicName(clinic.name);
+    setClinicAddress(clinic.address);
+    setClinicPhone(clinic.phone);
+    setClinicLatitude(String(clinic.latitude));
+    setClinicLongitude(String(clinic.longitude));
+    setClinicWilayaId(clinic.wilayaId);
+    setClinicCommuneId(clinic.communeId);
+    setClinicError(null);
+    setClinicModalVisible(true);
+  }, []);
+
+  const handleSaveClinic = useCallback(async () => {
+    const latitude = Number(clinicLatitude);
+    const longitude = Number(clinicLongitude);
+    if (
+      !clinicName.trim() ||
+      !clinicAddress.trim() ||
+      !clinicPhone.trim() ||
+      !clinicWilayaId ||
+      !clinicCommuneId ||
+      !Number.isFinite(latitude) ||
+      !Number.isFinite(longitude)
+    ) {
+      setClinicError('كل معلومات العيادة مطلوبة، بما فيها الإحداثيات.');
+      return;
+    }
+
+    setClinicSaving(true);
+    setClinicError(null);
+    try {
+      if (editingClinicId) {
+        await updateClinic({
+          clinicId: editingClinicId,
+          name: clinicName.trim(),
+          wilayaId: clinicWilayaId,
+          communeId: clinicCommuneId,
+          address: clinicAddress.trim(),
+          latitude,
+          longitude,
+          phone: clinicPhone.trim(),
+        });
+      } else {
+        await createClinic({
+          name: clinicName.trim(),
+          wilayaId: clinicWilayaId,
+          communeId: clinicCommuneId,
+          address: clinicAddress.trim(),
+          latitude,
+          longitude,
+          phone: clinicPhone.trim(),
+        });
+      }
+      setClinicModalVisible(false);
+      showToast();
+    } catch (error) {
+      setClinicError(getArabicErrorMessage(error, 'تعذر حفظ العيادة'));
+    } finally {
+      setClinicSaving(false);
+    }
+  }, [
+    clinicAddress,
+    clinicCommuneId,
+    clinicLatitude,
+    clinicLongitude,
+    clinicName,
+    clinicPhone,
+    clinicWilayaId,
+    createClinic,
+    editingClinicId,
+    showToast,
+    updateClinic,
+  ]);
+
+  const handleDeactivateClinic = useCallback(
+    async (clinicId: Id<'clinics'>) => {
+      await deactivateClinic({ clinicId });
+      showToast();
+    },
+    [deactivateClinic, showToast],
   );
 
   // ── Language toggle ───────────────────────────────────────────────────────
@@ -805,12 +995,17 @@ export default function DoctorProfileScreen() {
           </View>
 
           {/* ──────────────────────────────────────────────────────── */}
-          {/* Clinics Section (Placeholder)                           */}
+          {/* Clinics Section                                         */}
           {/* ──────────────────────────────────────────────────────── */}
           <SectionHeader title="العيادات" icon="business-outline" />
 
           <View style={styles.sectionCard}>
-            <ClinicsPlaceholder />
+            <ClinicsManager
+              clinics={activeClinics}
+              onAdd={handleOpenClinicModal}
+              onEdit={handleEditClinic}
+              onDeactivate={handleDeactivateClinic}
+            />
           </View>
 
           {/* ──────────────────────────────────────────────────────── */}
@@ -893,6 +1088,207 @@ export default function DoctorProfileScreen() {
           }}
           onClose={() => setSpecialtyPickerVisible(false)}
         />
+
+        {/* ── Add Clinic Modal ────────────────────────────────────── */}
+        <Modal
+          visible={clinicModalVisible}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setClinicModalVisible(false)}
+        >
+          <KeyboardAvoidingView
+            style={styles.pickerOverlay}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          >
+            <Pressable
+              style={styles.pickerBackdrop}
+              onPress={() => setClinicModalVisible(false)}
+            />
+            <View style={[styles.pickerSheet, styles.clinicModalSheet]}>
+              <View style={styles.pickerHandle}>
+                <View style={styles.pickerHandleBar} />
+              </View>
+              <View style={styles.pickerHeader}>
+                <Text style={styles.pickerTitle}>
+                  {editingClinicId ? 'تعديل عيادة' : 'إضافة عيادة'}
+                </Text>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.pickerCloseButton,
+                    pressed && styles.pickerCloseButtonPressed,
+                  ]}
+                  onPress={() => setClinicModalVisible(false)}
+                  accessibilityRole="button"
+                  accessibilityLabel="إغلاق"
+                >
+                  <Ionicons name="close" size={22} color={theme.colors.textSecondary} />
+                </Pressable>
+              </View>
+
+              <ScrollView
+                style={styles.clinicModalScroll}
+                contentContainerStyle={styles.clinicModalContent}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+              >
+                <FormField
+                  label="اسم العيادة"
+                  value={clinicName}
+                  onChangeText={setClinicName}
+                  placeholder="مثال: عيادة الشفاء"
+                />
+                <FormField
+                  label="العنوان"
+                  value={clinicAddress}
+                  onChangeText={setClinicAddress}
+                  placeholder="الشارع، الحي"
+                  multiline
+                  numberOfLines={2}
+                />
+                <FormField
+                  label="رقم الهاتف"
+                  value={clinicPhone}
+                  onChangeText={setClinicPhone}
+                  placeholder="0550 00 00 00"
+                  keyboardType="phone-pad"
+                />
+
+                <View style={styles.fieldContainer}>
+                  <Text style={styles.fieldLabel}>الولاية</Text>
+                  <View style={styles.chipsContainer}>
+                    {wilayas.map((wilaya) => {
+                      const isSelected = clinicWilayaId === wilaya._id;
+                      return (
+                        <Pressable
+                          key={wilaya._id}
+                          style={({ pressed }) => [
+                            styles.chip,
+                            isSelected && styles.chipSelected,
+                            pressed && styles.chipPressed,
+                          ]}
+                          onPress={() => {
+                            setClinicWilayaId(wilaya._id);
+                            setClinicCommuneId(null);
+                          }}
+                          accessibilityRole="button"
+                          accessibilityLabel={`اختيار ولاية ${wilaya.nameAr}`}
+                        >
+                          <Text
+                            style={[
+                              styles.chipText,
+                              isSelected && styles.chipTextSelected,
+                            ]}
+                          >
+                            {wilaya.nameAr}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                <View style={styles.fieldContainer}>
+                  <Text style={styles.fieldLabel}>البلدية</Text>
+                  {clinicWilayaId ? (
+                    <View style={styles.chipsContainer}>
+                      {communes.map((commune) => {
+                        const isSelected = clinicCommuneId === commune._id;
+                        return (
+                          <Pressable
+                            key={commune._id}
+                            style={({ pressed }) => [
+                              styles.chip,
+                              isSelected && styles.chipSelected,
+                              pressed && styles.chipPressed,
+                            ]}
+                            onPress={() => setClinicCommuneId(commune._id)}
+                            accessibilityRole="button"
+                            accessibilityLabel={`اختيار بلدية ${commune.nameAr}`}
+                          >
+                            <Text
+                              style={[
+                                styles.chipText,
+                                isSelected && styles.chipTextSelected,
+                              ]}
+                            >
+                              {commune.nameAr}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  ) : (
+                    <Text style={styles.fieldHint}>اختر الولاية أولاً</Text>
+                  )}
+                </View>
+
+                <View style={styles.coordinateRow}>
+                  <View style={styles.coordinateInput}>
+                    <FormField
+                      label="خط العرض"
+                      value={clinicLatitude}
+                      onChangeText={setClinicLatitude}
+                      placeholder="36.7525"
+                      keyboardType="numeric"
+                    />
+                  </View>
+                  <View style={styles.coordinateInput}>
+                    <FormField
+                      label="خط الطول"
+                      value={clinicLongitude}
+                      onChangeText={setClinicLongitude}
+                      placeholder="3.0419"
+                      keyboardType="numeric"
+                    />
+                  </View>
+                </View>
+
+                {clinicError ? (
+                  <Text style={styles.fieldError}>{clinicError}</Text>
+                ) : null}
+
+                <View style={styles.clinicModalActions}>
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.modalSecondaryButton,
+                      pressed && styles.saveButtonPressed,
+                    ]}
+                    onPress={() => setClinicModalVisible(false)}
+                    accessibilityRole="button"
+                    accessibilityLabel="إلغاء"
+                  >
+                    <Text style={styles.modalSecondaryButtonText}>إلغاء</Text>
+                  </Pressable>
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.modalPrimaryButton,
+                      clinicSaving && styles.saveButtonDisabled,
+                      pressed && !clinicSaving && styles.saveButtonPressed,
+                    ]}
+                    onPress={handleSaveClinic}
+                    disabled={clinicSaving}
+                    accessibilityRole="button"
+                    accessibilityLabel="حفظ العيادة"
+                  >
+                    <Ionicons
+                      name={clinicSaving ? 'hourglass-outline' : 'save-outline'}
+                      size={18}
+                      color={theme.colors.white}
+                      style={styles.saveButtonIcon}
+                    />
+                    <Text style={styles.modalPrimaryButtonText}>
+                      {clinicSaving
+                        ? 'جاري الحفظ...'
+                        : editingClinicId
+                          ? 'حفظ التعديل'
+                          : 'حفظ العيادة'}
+                    </Text>
+                  </Pressable>
+                </View>
+              </ScrollView>
+            </View>
+          </KeyboardAvoidingView>
+        </Modal>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -1130,42 +1526,142 @@ const styles = StyleSheet.create({
     color: theme.colors.primary,
   },
 
-  // ─── Clinics Placeholder ─────────────────────────────────────────────────
-  clinicsPlaceholder: {
+  // ─── Clinics Manager ─────────────────────────────────────────────────────
+  clinicsManager: {
+    gap: theme.spacing.md,
+  },
+  emptyClinicsBox: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: theme.spacing['3xl'],
+    paddingVertical: theme.spacing.xl,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.background,
   },
-  clinicsPlaceholderTitle: {
-    fontFamily: theme.typography.fontFamily.arabicBold,
-    fontSize: 16,
-    color: theme.colors.textPrimary,
-    marginTop: theme.spacing.md,
-    textAlign: 'center',
-  },
-  clinicsPlaceholderSubtitle: {
+  emptyClinicsText: {
     fontFamily: theme.typography.fontFamily.arabic,
     fontSize: 13,
     color: theme.colors.textSecondary,
     marginTop: theme.spacing.sm,
     textAlign: 'center',
-    lineHeight: 20,
-    paddingHorizontal: theme.spacing.xl,
   },
-  clinicsPlaceholderBadge: {
+  clinicManageCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.secondary,
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.sm,
-    borderRadius: theme.borderRadius.xl,
-    marginTop: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: theme.colors.border,
   },
-  clinicsPlaceholderBadgeText: {
+  clinicManageInfo: {
+    flex: 1,
+  },
+  clinicManageName: {
+    fontFamily: theme.typography.fontFamily.arabicBold,
+    fontSize: 14,
+    color: theme.colors.textPrimary,
+    textAlign: rtlTextAlign(),
+  },
+  clinicManageDetail: {
+    fontFamily: theme.typography.fontFamily.arabic,
+    fontSize: 12,
+    color: theme.colors.textSecondary,
+    marginTop: theme.spacing.xs,
+    textAlign: rtlTextAlign(),
+  },
+  clinicManageActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+    marginRight: theme.spacing.md,
+  },
+  clinicEditButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: theme.colors.secondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  clinicDeactivateButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FDECEC',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addClinicButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.secondary,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+    paddingVertical: theme.spacing.md,
+  },
+  addClinicButtonText: {
     fontFamily: theme.typography.fontFamily.arabicBold,
     fontSize: 13,
     color: theme.colors.primary,
     marginRight: theme.spacing.xs,
+  },
+  fieldHint: {
+    fontFamily: theme.typography.fontFamily.arabic,
+    fontSize: 13,
+    color: theme.colors.textSecondary,
+    textAlign: rtlTextAlign(),
+  },
+  coordinateRow: {
+    flexDirection: 'row',
+    gap: theme.spacing.md,
+  },
+  coordinateInput: {
+    flex: 1,
+  },
+  clinicModalSheet: {
+    maxHeight: '85%',
+  },
+  clinicModalScroll: {
+    maxHeight: '100%',
+  },
+  clinicModalContent: {
+    paddingHorizontal: theme.spacing.lg,
+    paddingTop: theme.spacing.lg,
+    paddingBottom: theme.spacing['3xl'],
+  },
+  clinicModalActions: {
+    flexDirection: 'row',
+    gap: theme.spacing.md,
+    marginTop: theme.spacing.md,
+  },
+  modalSecondaryButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.background,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  modalSecondaryButtonText: {
+    fontFamily: theme.typography.fontFamily.arabicBold,
+    fontSize: 14,
+    color: theme.colors.textPrimary,
+  },
+  modalPrimaryButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.primary,
+  },
+  modalPrimaryButtonText: {
+    fontFamily: theme.typography.fontFamily.arabicBold,
+    fontSize: 14,
+    color: theme.colors.white,
   },
 
   // ─── Save Button ─────────────────────────────────────────────────────────

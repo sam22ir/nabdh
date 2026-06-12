@@ -117,3 +117,43 @@ describe("users.register", () => {
     ).rejects.toThrow(/patient profile|required|commune|birth|gender/i);
   });
 });
+
+describe("users.completePatientProfile", () => {
+  test("creates the missing patient profile for an existing patient user", async () => {
+    const t = convexTest(schema, modules);
+    const ids = await t.run(async (ctx) => {
+      const wilayaId = await ctx.db.insert("wilayas", {
+        id: 16,
+        nameAr: "الجزائر",
+        nameFr: "Alger",
+      });
+      const communeId = await ctx.db.insert("communes", {
+        wilayaId,
+        nameAr: "الجزائر الوسطى",
+        nameFr: "Alger Centre",
+      });
+      const userId = await ctx.db.insert("users", {
+        email: "missing-profile@example.test",
+        role: "patient",
+        fullNameAr: "مريض بلا ملف",
+        isActive: true,
+      });
+      return { communeId, userId };
+    });
+
+    await expect(
+      asUser(t, ids.userId).mutation(api.users.completePatientProfile, {
+        dateOfBirth: "1990-01-01",
+        gender: "male",
+        communeId: ids.communeId,
+      }),
+    ).resolves.toBeTypeOf("string");
+
+    const me = await asUser(t, ids.userId).query(api.users.me, {});
+    expect(me?.profile).toMatchObject({
+      dateOfBirth: "1990-01-01",
+      gender: "male",
+      communeId: ids.communeId,
+    });
+  });
+});

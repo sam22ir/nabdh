@@ -9,6 +9,7 @@ import { api } from "../../convex/_generated/api";
 const TAB_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   dashboard: "grid",
   appointments: "calendar",
+  schedule: "calendar",
   profile: "person",
   settings: "settings",
 };
@@ -16,6 +17,7 @@ const TAB_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
 const ARABIC_LABELS: Record<string, string> = {
   dashboard: "لوحتي",
   appointments: "المواعيد",
+  schedule: "الجدول",
   profile: "ملفي",
   settings: "الإعدادات",
 };
@@ -76,6 +78,7 @@ export default function DoctorTabLayout() {
     >
       <Tabs.Screen name="dashboard" />
       <Tabs.Screen name="appointments" />
+      <Tabs.Screen name="schedule" />
       <Tabs.Screen name="profile" />
       <Tabs.Screen name="settings" />
     </Tabs>

@@ -16,6 +16,7 @@ import { useAuthActions } from '@convex-dev/auth/react';
 import { theme } from '@/lib/theme';
 import { rtlTextAlign } from '@/lib/rtl';
 import { useAuthStore } from '@/stores/authStore';
+import { useDoctorSettingsStore } from '@/stores/doctorSettingsStore';
 
 // =============================================================================
 // Constants
@@ -269,14 +270,23 @@ export default function DoctorSettingsScreen() {
   const { signOut } = useAuthActions();
   const clearUser = useAuthStore((s) => s.clearUser);
 
-  // ── Notification toggles ──────────────────────────────────────────────────
-  const [newBookingAlerts, setNewBookingAlerts] = useState(true);
-  const [cancellationAlerts, setCancellationAlerts] = useState(true);
-  const [dailySummary, setDailySummary] = useState(false);
+  const newBookingAlerts = useDoctorSettingsStore((s) => s.newBookingAlerts);
+  const setNewBookingAlerts = useDoctorSettingsStore(
+    (s) => s.setNewBookingAlerts,
+  );
+  const cancellationAlerts = useDoctorSettingsStore(
+    (s) => s.cancellationAlerts,
+  );
+  const setCancellationAlerts = useDoctorSettingsStore(
+    (s) => s.setCancellationAlerts,
+  );
+  const dailySummary = useDoctorSettingsStore((s) => s.dailySummary);
+  const setDailySummary = useDoctorSettingsStore((s) => s.setDailySummary);
+  const minCancelHours = useDoctorSettingsStore((s) => s.minCancelHours);
+  const setMinCancelHours = useDoctorSettingsStore(
+    (s) => s.setMinCancelHours,
+  );
 
-  // ── Booking settings ──────────────────────────────────────────────────────
-  const [autoConfirm, setAutoConfirm] = useState(false);
-  const [minCancelHours, setMinCancelHours] = useState(6);
   const [privacyModalVisible, setPrivacyModalVisible] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
 
@@ -354,8 +364,8 @@ export default function DoctorSettingsScreen() {
         <View style={styles.sectionCard}>
           <ToggleRow
             label="التأكيد التلقائي للحجوزات"
-            value={autoConfirm}
-            onValueChange={setAutoConfirm}
+            value={false}
+            onValueChange={() => undefined}
             disabled
             disabledBadge="قريباً"
           />

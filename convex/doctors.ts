@@ -31,6 +31,7 @@ const doctorFields = {
 const userProfileValidator = v.object({
   fullNameAr: v.union(v.string(), v.null()),
   phone: v.union(v.string(), v.null()),
+  gender: v.union(v.literal("male"), v.literal("female"), v.null()),
 });
 
 const specialtyInfoValidator = v.object({
@@ -64,6 +65,7 @@ const doctorCardValidator = v.object({
   ...doctorFields,
   user: userProfileValidator,
   specialty: specialtyInfoValidator,
+  isAvailableToday: v.boolean(),
 });
 
 const doctorDetailValidator = v.object({
@@ -95,23 +97,116 @@ async function enrichDoctorPage(
 ): Promise<any[]> {
   return await Promise.all(
     page.map(async (doc) => {
-      const [user, specialty] = await Promise.all([
+      const [user, specialty, isAvailableToday] = await Promise.all([
         ctx.db.get(doc.userId),
         ctx.db.get(doc.specialtyId),
+        doctorHasActiveScheduleToday(ctx, doc._id),
       ]);
       return {
         ...doc,
         user: {
           fullNameAr: user?.fullNameAr ?? null,
           phone: user?.phone ?? null,
+          gender: user?.gender ?? null,
         },
         specialty: {
           nameAr: specialty?.nameAr ?? "",
           nameFr: specialty?.nameFr ?? "",
         },
+        isAvailableToday,
       };
     }),
   );
+}
+
+async function doctorHasActiveScheduleToday(ctx: any, doctorId: Id<"doctors">) {
+  const today = new Date().getDay();
+  const clinics = await ctx.db
+    .query("clinics")
+    .withIndex("by_doctorId", (q: any) => q.eq("doctorId", doctorId))
+    .collect();
+
+  for (const clinic of clinics) {
+    if (!clinic.isActive) continue;
+    const schedules = await ctx.db
+      .query("schedules")
+      .withIndex("by_clinicId_and_dayOfWeek", (q: any) =>
+        q.eq("clinicId", clinic._id).eq("dayOfWeek", today),
+      )
+      .collect();
+    if (schedules.some((schedule: any) => schedule.isActive)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+async function applyDoctorFilters(
+  ctx: any,
+  doctors: any[],
+  filters: {
+    specialtyId?: Id<"specialties">;
+    wilayaId?: Id<"wilayas">;
+    gender?: "male" | "female";
+    language?: string;
+    availableToday?: boolean;
+  },
+) {
+  let filtered = doctors;
+
+  if (filters.specialtyId) {
+    filtered = filtered.filter(
+      (d) =>
+        d.specialtyId === filters.specialtyId ||
+        d.subSpecialties.some((s: Id<"specialties">) => s === filters.specialtyId),
+    );
+  }
+
+  if (filters.wilayaId) {
+    const clinics = await ctx.db
+      .query("clinics")
+      .withIndex("by_wilaya", (q: any) => q.eq("wilayaId", filters.wilayaId!))
+      .collect();
+    const doctorIdsInWilaya = new Set(
+      clinics.filter((clinic: any) => clinic.isActive).map((c: any) => c.doctorId),
+    );
+    filtered = filtered.filter((d) => doctorIdsInWilaya.has(d._id));
+  }
+
+  if (filters.gender) {
+    const users = await Promise.all(
+      [...new Set(filtered.map((d) => d.userId))].map((id) => ctx.db.get(id)),
+    );
+    const userGenderById = new Map(
+      users.filter(Boolean).map((u) => [u!._id, u!.gender ?? null]),
+    );
+    filtered = filtered.filter((d) => userGenderById.get(d.userId) === filters.gender);
+  }
+
+  if (filters.language) {
+    const lang = filters.language.toLowerCase();
+    filtered = filtered.filter((d) =>
+      d.languages.some((l: string) => l.toLowerCase() === lang),
+    );
+  }
+
+  if (filters.availableToday) {
+    const availability = await Promise.all(
+      filtered.map(async (doctor) => ({
+        doctorId: doctor._id,
+        isAvailableToday: await doctorHasActiveScheduleToday(ctx, doctor._id),
+      })),
+    );
+    const availableDoctorIds = new Set(
+      availability
+        .filter((entry) => entry.isAvailableToday)
+        .map((entry) => entry.doctorId),
+    );
+    filtered = filtered.filter((doctor) => availableDoctorIds.has(doctor._id));
+  }
+
+  return filtered;
 }
 
 // ---------------------------------------------------------------------------
@@ -126,8 +221,9 @@ async function enrichDoctorPage(
  *   wilayaId     — only doctors who have at least one active clinic in the
  *                  given wilaya (pre-fetches clinic doctorIds)
  *   gender       — placeholder; requires a `gender` field on the `users`
- *                  table (not yet in the schema)
+ *                  table
  *   language     — case-insensitive match on the doctor's languages array
+ *   availableToday — only doctors with an active clinic schedule today
  *
  * Because no compound index on (isVerified, avgRating) exists yet, all
  * verified doctors are collected in memory, sorted, and paginated manually.
@@ -141,6 +237,7 @@ export const listPublic = query({
     wilayaId: v.optional(v.id("wilayas")),
     gender: v.optional(v.union(v.literal("male"), v.literal("female"))),
     language: v.optional(v.string()),
+    availableToday: v.optional(v.boolean()),
   },
   returns: paginatedResponseValidator,
   handler: async (ctx, args) => {
@@ -149,34 +246,7 @@ export const listPublic = query({
       .withIndex("by_verified", (q) => q.eq("isVerified", true))
       .collect();
 
-    let filtered = allDoctors;
-
-    // Filter by specialty
-    if (args.specialtyId) {
-      filtered = filtered.filter((d) => d.specialtyId === args.specialtyId);
-    }
-
-    // Filter by wilaya — query clinics to find doctors practising there
-    if (args.wilayaId) {
-      const clinics = await ctx.db
-        .query("clinics")
-        .withIndex("by_wilaya", (q: any) => q.eq("wilayaId", args.wilayaId!))
-        .collect();
-      const doctorIdsInWilaya = new Set(clinics.map((c) => c.doctorId));
-      filtered = filtered.filter((d) => doctorIdsInWilaya.has(d._id));
-    }
-
-    // Filter by language (case-insensitive exact match)
-    if (args.language) {
-      const lang = args.language.toLowerCase();
-      filtered = filtered.filter((d) =>
-        d.languages.some((l) => l.toLowerCase() === lang),
-      );
-    }
-
-    // Gender filter — not yet implemented.  The `users` table and `doctors`
-    // table do not currently store a gender field.  Once one of them does,
-    // use a compound index or a pre-filter here.
+    const filtered = await applyDoctorFilters(ctx, allDoctors, args);
 
     // Sort by avgRating descending
     filtered.sort((a, b) => b.avgRating - a.avgRating);
@@ -214,6 +284,11 @@ export const listPublic = query({
 export const search = query({
   args: {
     query: v.string(),
+    specialtyId: v.optional(v.id("specialties")),
+    wilayaId: v.optional(v.id("wilayas")),
+    gender: v.optional(v.union(v.literal("male"), v.literal("female"))),
+    language: v.optional(v.string()),
+    availableToday: v.optional(v.boolean()),
     paginationOpts: paginationOptsValidator,
   },
   returns: paginatedResponseValidator,
@@ -293,9 +368,13 @@ export const search = query({
     // -----------------------------------------------------------------------
     // Step 5 — sort and paginate
     // -----------------------------------------------------------------------
-    const matched = allDoctors
-      .filter((d) => matchedSet.has(d._id))
-      .sort((a, b) => b.avgRating - a.avgRating);
+    const matched = (
+      await applyDoctorFilters(
+        ctx,
+        allDoctors.filter((d) => matchedSet.has(d._id)),
+        args,
+      )
+    ).sort((a, b) => b.avgRating - a.avgRating);
 
     const { numItems } = args.paginationOpts;
     const cursorStr = args.paginationOpts.cursor ?? "";
@@ -430,14 +509,16 @@ export const getFavorites = query({
         return {
           ...doctor,
           user: {
-            fullNameAr: docUser?.fullNameAr ?? null,
-            phone: docUser?.phone ?? null,
-          },
-          specialty: {
-            nameAr: specialty?.nameAr ?? "",
-            nameFr: specialty?.nameFr ?? "",
-          },
-        };
+          fullNameAr: docUser?.fullNameAr ?? null,
+          phone: docUser?.phone ?? null,
+          gender: docUser?.gender ?? null,
+        },
+        specialty: {
+          nameAr: specialty?.nameAr ?? "",
+          nameFr: specialty?.nameFr ?? "",
+        },
+        isAvailableToday: await doctorHasActiveScheduleToday(ctx, doctor._id),
+      };
       }),
     );
 

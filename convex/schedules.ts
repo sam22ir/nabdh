@@ -147,6 +147,46 @@ export const getByClinic = query({
 });
 
 /**
+ * Returns all schedule rows across every active clinic for a doctor. Public so
+ * the patient-facing doctor detail page can show each clinic's own hours.
+ */
+export const getByDoctor = query({
+  args: { doctorId: v.id("doctors") },
+  returns: v.array(v.object(scheduleFields)),
+  handler: async (ctx, args) => {
+    const doctor = await ctx.db.get(args.doctorId);
+    if (!doctor) return [];
+
+    const clinics = await ctx.db
+      .query("clinics")
+      .withIndex("by_doctorId", (q) => q.eq("doctorId", args.doctorId))
+      .collect();
+
+    const results: Array<Doc<"schedules">> = [];
+    for (const clinic of clinics) {
+      if (!clinic.isActive) continue;
+      const schedules = await ctx.db
+        .query("schedules")
+        .withIndex("by_clinicId", (q) => q.eq("clinicId", clinic._id))
+        .collect();
+      results.push(...schedules);
+    }
+
+    return results.map((r) => ({
+      _id: r._id,
+      _creationTime: r._creationTime,
+      clinicId: r.clinicId,
+      dayOfWeek: r.dayOfWeek,
+      startTime: r.startTime,
+      endTime: r.endTime,
+      appointmentDurationMinutes: r.appointmentDurationMinutes,
+      maxPatientsPerDay: r.maxPatientsPerDay,
+      isActive: r.isActive,
+    }));
+  },
+});
+
+/**
  * Returns the effective schedule for a specific date at a clinic, considering
  * any schedule exceptions (holidays, custom hours).
  *

@@ -11,4 +11,13 @@ describe("login submission", () => {
 
     expect(source).toContain("flow: 'signIn'");
   });
+
+  test("forgot password button invokes a user-facing reset handler", () => {
+    const source = loginSource();
+
+    expect(source).toContain("handleForgotPassword");
+    expect(source).toContain("flow: 'reset'");
+    expect(source).toContain("Alert.alert");
+    expect(source).not.toContain("Placeholder");
+  });
 });

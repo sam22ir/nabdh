@@ -60,7 +60,7 @@ async function seedScheduleData() {
       isActive: true,
     });
 
-    return { doctorUserId, clinicId };
+    return { doctorUserId, doctorId, clinicId, wilayaId, communeId };
   });
 
   return { t, ids };
@@ -156,5 +156,58 @@ describe("schedules.getMyExceptions", () => {
     expect(exceptions[0]._id).toBe(exceptionId);
     expect(exceptions[0].clinicId).toBe(ids.clinicId);
     expect(exceptions[0].clinicName).toBe("عيادة");
+  });
+});
+
+describe("schedules.getByDoctor", () => {
+  test("returns schedule entries across every active clinic for a doctor", async () => {
+    const { t, ids } = await seedScheduleData();
+
+    const secondClinicId = await t.run(async (ctx) => {
+      return await ctx.db.insert("clinics", {
+        doctorId: ids.doctorId,
+        name: "عيادة ثانية",
+        wilayaId: ids.wilayaId,
+        communeId: ids.communeId,
+        address: "2 Main",
+        latitude: 36.8,
+        longitude: 3.1,
+        phone: "0555000001",
+        isActive: true,
+      });
+    });
+
+    const [firstScheduleId, secondScheduleId] = await t.run(async (ctx) => {
+      const first = await ctx.db.insert("schedules", {
+        clinicId: ids.clinicId,
+        dayOfWeek: 1,
+        startTime: "09:00",
+        endTime: "12:00",
+        appointmentDurationMinutes: 30,
+        maxPatientsPerDay: 10,
+        isActive: true,
+      });
+      const second = await ctx.db.insert("schedules", {
+        clinicId: secondClinicId,
+        dayOfWeek: 2,
+        startTime: "13:00",
+        endTime: "16:00",
+        appointmentDurationMinutes: 30,
+        maxPatientsPerDay: 10,
+        isActive: true,
+      });
+      return [first, second];
+    });
+
+    const schedules = await t.query(api.schedules.getByDoctor, {
+      doctorId: ids.doctorId,
+    });
+
+    expect(schedules.map((schedule) => schedule._id).sort()).toEqual(
+      [firstScheduleId, secondScheduleId].sort(),
+    );
+    expect(new Set(schedules.map((schedule) => schedule.clinicId))).toEqual(
+      new Set([ids.clinicId, secondClinicId]),
+    );
   });
 });

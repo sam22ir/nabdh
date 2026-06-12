@@ -26,6 +26,7 @@ import { ConvexError } from 'convex/values';
 
 import { api } from '@/convex/_generated/api';
 import { theme } from '@/lib/theme';
+import { getArabicErrorMessage } from '@/lib/errorMessages';
 import { isIsoDateParam, isTimeParam, routeParamString } from '@/lib/routeParams';
 import type { VisitType } from '@/lib/types';
 import type { Id } from '@/convex/_generated/dataModel';
@@ -383,7 +384,7 @@ export default function BookingConfirmScreen() {
     if (!me.profile) {
       Alert.alert(
         'أكمل ملفك الطبي',
-        'Patient profile not found. يرجى إكمال ملفك الطبي قبل تأكيد الحجز.',
+        'يرجى إكمال ملفك الطبي قبل تأكيد الحجز.',
       );
       return;
     }
@@ -440,9 +441,10 @@ export default function BookingConfirmScreen() {
       // Generic error
       Alert.alert(
         'خطأ',
-        error instanceof Error
-          ? error.message
-          : 'حدث خطأ أثناء تأكيد الحجز. يرجى المحاولة مرة أخرى.',
+        getArabicErrorMessage(
+          error,
+          'حدث خطأ أثناء تأكيد الحجز. يرجى المحاولة مرة أخرى.',
+        ),
       );
     } finally {
       setIsCreating(false);

@@ -64,6 +64,142 @@ function asDoctor(
   });
 }
 
+async function seedDoctorSearchFilterData() {
+  const t = convexTest(schema, modules);
+
+  const ids = await t.run(async (ctx) => {
+    const algiersWilayaId = await ctx.db.insert("wilayas", {
+      id: 16,
+      nameAr: "الجزائر",
+      nameFr: "Alger",
+    });
+    const oranWilayaId = await ctx.db.insert("wilayas", {
+      id: 31,
+      nameAr: "وهران",
+      nameFr: "Oran",
+    });
+    const algiersCommuneId = await ctx.db.insert("communes", {
+      wilayaId: algiersWilayaId,
+      nameAr: "الجزائر الوسطى",
+      nameFr: "Alger Centre",
+    });
+    const oranCommuneId = await ctx.db.insert("communes", {
+      wilayaId: oranWilayaId,
+      nameAr: "وهران",
+      nameFr: "Oran",
+    });
+    const cardiologyId = await ctx.db.insert("specialties", {
+      nameAr: "طب القلب",
+      nameFr: "Cardiologie",
+      icon: "heart",
+    });
+    const pediatricsId = await ctx.db.insert("specialties", {
+      nameAr: "طب الأطفال",
+      nameFr: "Pediatrie",
+      icon: "child",
+    });
+
+    const today = new Date().getDay();
+
+    const maleDoctorUserId = await ctx.db.insert("users", {
+      email: "male-search-doctor@example.test",
+      role: "doctor",
+      fullNameAr: "طبيب قلب",
+      gender: "male",
+      isActive: true,
+    });
+    const maleDoctorId = await ctx.db.insert("doctors", {
+      userId: maleDoctorUserId,
+      specialtyId: cardiologyId,
+      subSpecialties: [],
+      bioAr: "",
+      bioFr: "",
+      yearsOfExperience: 8,
+      languages: ["ar"],
+      orderRegistrationNumber: "SEARCH-M",
+      isVerified: true,
+      isProfileComplete: true,
+      consultationFee: 2500,
+      followUpFee: 1200,
+      avgRating: 4.9,
+      totalReviews: 10,
+    });
+    const maleClinicId = await ctx.db.insert("clinics", {
+      doctorId: maleDoctorId,
+      name: "عيادة الجزائر",
+      wilayaId: algiersWilayaId,
+      communeId: algiersCommuneId,
+      address: "Alger",
+      latitude: 36.7,
+      longitude: 3.0,
+      phone: "0555000010",
+      isActive: true,
+    });
+    await ctx.db.insert("schedules", {
+      clinicId: maleClinicId,
+      dayOfWeek: today,
+      startTime: "09:00",
+      endTime: "12:00",
+      appointmentDurationMinutes: 30,
+      maxPatientsPerDay: 10,
+      isActive: true,
+    });
+
+    const femaleDoctorUserId = await ctx.db.insert("users", {
+      email: "female-search-doctor@example.test",
+      role: "doctor",
+      fullNameAr: "طبيبة أطفال",
+      gender: "female",
+      isActive: true,
+    });
+    const femaleDoctorId = await ctx.db.insert("doctors", {
+      userId: femaleDoctorUserId,
+      specialtyId: pediatricsId,
+      subSpecialties: [],
+      bioAr: "",
+      bioFr: "",
+      yearsOfExperience: 6,
+      languages: ["ar"],
+      orderRegistrationNumber: "SEARCH-F",
+      isVerified: true,
+      isProfileComplete: true,
+      consultationFee: 1800,
+      followUpFee: 900,
+      avgRating: 4.4,
+      totalReviews: 7,
+    });
+    const femaleClinicId = await ctx.db.insert("clinics", {
+      doctorId: femaleDoctorId,
+      name: "عيادة وهران",
+      wilayaId: oranWilayaId,
+      communeId: oranCommuneId,
+      address: "Oran",
+      latitude: 35.7,
+      longitude: -0.6,
+      phone: "0555000011",
+      isActive: true,
+    });
+    await ctx.db.insert("schedules", {
+      clinicId: femaleClinicId,
+      dayOfWeek: (today + 1) % 7,
+      startTime: "09:00",
+      endTime: "12:00",
+      appointmentDurationMinutes: 30,
+      maxPatientsPerDay: 10,
+      isActive: true,
+    });
+
+    return {
+      algiersWilayaId,
+      cardiologyId,
+      maleDoctorId,
+      femaleDoctorId,
+    };
+  });
+
+  return { t, ids };
+}
+
 describe("doctor rating aggregation", () => {
   test("uses the hidden-review index instead of scan filtering", () => {
     const source = readFileSync(join(process.cwd(), "convex/doctors.ts"), "utf8");
@@ -189,5 +325,37 @@ describe("doctors.toggleFavorite", () => {
       isFavorite: false,
       error: "patient_profile_missing",
     });
+  });
+});
+
+describe("doctors.listPublic filters", () => {
+  test("filters by specialty, wilaya, gender, and available-today", async () => {
+    const { t, ids } = await seedDoctorSearchFilterData();
+
+    const bySpecialtyAndWilaya = await t.query(api.doctors.listPublic, {
+      specialtyId: ids.cardiologyId,
+      wilayaId: ids.algiersWilayaId,
+      paginationOpts: { numItems: 10, cursor: null },
+    });
+    expect(bySpecialtyAndWilaya.page.map((doctor) => doctor._id)).toEqual([
+      ids.maleDoctorId,
+    ]);
+
+    const byGender = await t.query(api.doctors.listPublic, {
+      gender: "female",
+      paginationOpts: { numItems: 10, cursor: null },
+    });
+    expect(byGender.page.map((doctor) => doctor._id)).toEqual([
+      ids.femaleDoctorId,
+    ]);
+
+    const byAvailableToday = await t.query(api.doctors.listPublic, {
+      availableToday: true,
+      paginationOpts: { numItems: 10, cursor: null },
+    });
+    expect(byAvailableToday.page.map((doctor) => doctor._id)).toEqual([
+      ids.maleDoctorId,
+    ]);
+    expect(byAvailableToday.page[0].isAvailableToday).toBe(true);
   });
 });

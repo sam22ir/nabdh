@@ -23,6 +23,7 @@ import { useMutation, useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { theme } from '@/lib/theme';
 import { rtlTextAlign } from '@/lib/rtl';
+import { getArabicErrorMessage } from '@/lib/errorMessages';
 import { routeParamString } from '@/lib/routeParams';
 import type { Id } from '@/convex/_generated/dataModel';
 
@@ -583,14 +584,12 @@ function BookingButton({
     [schedules],
   );
 
-  const handleBook = (clinicId?: string) => {
+  const handleBook = () => {
     router.push({
-      pathname: '/(patient)/booking/datetime',
-      params: { doctorId, clinicId: clinicId ?? clinics[0]?._id ?? '' },
+      pathname: '/(patient)/booking/clinic',
+      params: { doctorId },
     } as any);
   };
-
-  const targetClinicId = clinics[0]?._id;
 
   return (
     <SafeAreaView edges={['bottom']} style={styles.bottomBarSafe}>
@@ -603,7 +602,7 @@ function BookingButton({
               <Pressable
                 key={i}
                 style={styles.slotChip}
-                onPress={() => handleBook(slot.clinicId)}
+                onPress={handleBook}
               >
                 <Text style={styles.slotChipText}>
                   {slot.dayName} {slot.time}
@@ -625,7 +624,7 @@ function BookingButton({
             styles.bookButton,
             pressed && styles.bookButtonPressed,
           ]}
-          onPress={() => handleBook(targetClinicId)}
+          onPress={handleBook}
           accessibilityRole="button"
           accessibilityLabel="احجز موعداً"
         >
@@ -761,7 +760,7 @@ export default function DoctorProfileScreen() {
     if (!me?.profile) {
       Alert.alert(
         'أكمل ملفك الطبي',
-        'Patient profile not found. يرجى إكمال ملفك الطبي قبل إضافة الطبيب إلى المفضلة.',
+        'يرجى إكمال ملفك الطبي قبل إضافة الطبيب إلى المفضلة.',
       );
       return;
     }
@@ -772,26 +771,26 @@ export default function DoctorProfileScreen() {
       if (!result.ok && result.error === 'patient_profile_missing') {
         Alert.alert(
           'أكمل ملفك الطبي',
-          'Patient profile not found. يرجى إكمال ملفك الطبي قبل إضافة الطبيب إلى المفضلة.',
+          'يرجى إكمال ملفك الطبي قبل إضافة الطبيب إلى المفضلة.',
         );
       }
     } catch (error) {
       Alert.alert(
         'تعذر تحديث المفضلة',
-        error instanceof Error
-          ? error.message
-          : 'يرجى تسجيل الدخول كمريض ثم المحاولة مرة أخرى.',
+        getArabicErrorMessage(
+          error,
+          'يرجى تسجيل الدخول كمريض ثم المحاولة مرة أخرى.',
+        ),
       );
     } finally {
       setIsTogglingFavorite(false);
     }
   }, [id, isTogglingFavorite, me, toggleFavorite]);
 
-  // ── Clinic schedules for the first clinic ─────────────────────────────────
-  const primaryClinicId = doctor?.clinics?.[0]?._id;
+  // ── Clinic schedules for all of this doctor's clinics ─────────────────────
   const schedulesRaw = useQuery(
-    api.schedules.getByClinic,
-    primaryClinicId ? { clinicId: primaryClinicId } : 'skip',
+    api.schedules.getByDoctor,
+    id ? { doctorId: id as Id<'doctors'> } : 'skip',
   );
   const schedules = (schedulesRaw ?? []) as ConvexSchedule[];
 

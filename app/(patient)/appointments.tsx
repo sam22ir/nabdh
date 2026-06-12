@@ -27,6 +27,7 @@ import { api } from '@/convex/_generated/api';
 import AppointmentCard from '@/components/AppointmentCard';
 import EmptyState from '@/components/EmptyState';
 import { theme } from '@/lib/theme';
+import { getArabicErrorMessage } from '@/lib/errorMessages';
 import type { AppointmentStatus } from '@/lib/types';
 import type { Id } from '@/convex/_generated/dataModel';
 
@@ -84,6 +85,19 @@ interface EnrichedAppointment {
   doctorName: string;
   specialty: string;
   clinicName: string;
+}
+
+interface PendingReviewEntry {
+  bookingId: Id<'bookings'>;
+  appointmentDate: string;
+  appointmentTime: string;
+  appointmentDuration: number;
+  visitType: string;
+  doctorId: Id<'doctors'>;
+  doctorName: string;
+  clinicId: Id<'clinics'>;
+  clinicName: string;
+  completedAt?: number;
 }
 
 // =============================================================================
@@ -362,6 +376,146 @@ function CancelModal({
   );
 }
 
+interface ReviewModalProps {
+  visible: boolean;
+  appointmentName: string;
+  loading: boolean;
+  onClose: () => void;
+  onSubmit: (rating: number, comment: string, isAnonymous: boolean) => void;
+}
+
+function ReviewModal({
+  visible,
+  appointmentName,
+  loading,
+  onClose,
+  onSubmit,
+}: ReviewModalProps) {
+  const [rating, setRating] = useState(5);
+  const [comment, setComment] = useState('');
+  const [isAnonymous, setIsAnonymous] = useState(false);
+
+  React.useEffect(() => {
+    if (visible) {
+      setRating(5);
+      setComment('');
+      setIsAnonymous(false);
+    }
+  }, [visible]);
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContainer}>
+          <Text style={styles.modalTitle}>قيم الطبيب</Text>
+          <Text style={styles.modalAppointmentName}>{appointmentName}</Text>
+
+          <View style={styles.ratingPicker}>
+            {[1, 2, 3, 4, 5].map((star) => {
+              const isSelected = star <= rating;
+              return (
+                <Pressable
+                  key={star}
+                  style={({ pressed }) => [
+                    styles.starButton,
+                    pressed && styles.starButtonPressed,
+                  ]}
+                  onPress={() => setRating(star)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${star} نجوم`}
+                >
+                  <Text
+                    style={[
+                      styles.starText,
+                      isSelected && styles.starTextSelected,
+                    ]}
+                  >
+                    ★
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <TextInput
+            style={styles.reviewInput}
+            placeholder="اكتب ملاحظتك للطبيب..."
+            placeholderTextColor={theme.colors.textSecondary}
+            value={comment}
+            onChangeText={setComment}
+            textAlign="right"
+            textAlignVertical="top"
+            multiline
+            maxLength={500}
+            editable={!loading}
+          />
+
+          <Pressable
+            style={({ pressed }) => [
+              styles.anonymousOption,
+              isAnonymous && styles.anonymousOptionSelected,
+              pressed && styles.modalButtonPressed,
+            ]}
+            onPress={() => setIsAnonymous((value) => !value)}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: isAnonymous }}
+            accessibilityLabel="إرسال التقييم بدون إظهار الاسم"
+          >
+            <View
+              style={[
+                styles.checkbox,
+                isAnonymous && styles.checkboxSelected,
+              ]}
+            >
+              {isAnonymous ? <Text style={styles.checkboxMark}>✓</Text> : null}
+            </View>
+            <Text style={styles.anonymousText}>إرسال بدون إظهار الاسم</Text>
+          </Pressable>
+
+          <View style={styles.modalActions}>
+            <Pressable
+              style={({ pressed }) => [
+                styles.modalButton,
+                styles.modalButtonSecondary,
+                pressed && styles.modalButtonPressed,
+              ]}
+              onPress={onClose}
+              disabled={loading}
+              accessibilityRole="button"
+              accessibilityLabel="إلغاء"
+            >
+              <Text style={styles.modalButtonSecondaryText}>إلغاء</Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [
+                styles.modalButton,
+                styles.modalButtonPrimary,
+                pressed && !loading && styles.modalButtonPressed,
+                loading && styles.modalButtonDisabled,
+              ]}
+              onPress={() => onSubmit(rating, comment, isAnonymous)}
+              disabled={loading}
+              accessibilityRole="button"
+              accessibilityLabel="إرسال التقييم"
+            >
+              {loading ? (
+                <ActivityIndicator size="small" color={theme.colors.white} />
+              ) : (
+                <Text style={styles.modalButtonPrimaryText}>إرسال التقييم</Text>
+              )}
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 // =============================================================================
 // Main Screen Component
 // =============================================================================
@@ -374,16 +528,21 @@ export default function AppointmentsScreen() {
   const [cancelTarget, setCancelTarget] = useState<EnrichedAppointment | null>(
     null,
   );
+  const [reviewTarget, setReviewTarget] = useState<EnrichedAppointment | null>(
+    null,
+  );
 
   // ── Data fetching via Convex ─────────────────────────────────────────────
   const upcomingQuery = useQuery(api.bookings.listMyUpcoming);
   const pastQuery = useQuery(api.bookings.listMyPast);
   const cancelledQuery = useQuery(api.bookings.listMyCancelled);
+  const pendingReviewsQuery = useQuery(api.reviews.getMyPending, {});
 
   const isLoading =
     upcomingQuery === undefined ||
     pastQuery === undefined ||
-    cancelledQuery === undefined;
+    cancelledQuery === undefined ||
+    pendingReviewsQuery === undefined;
 
   // ── Merge all three lists into one enriched array ────────────────────────
   const allAppointments: EnrichedAppointment[] = useMemo(() => {
@@ -399,9 +558,16 @@ export default function AppointmentsScreen() {
     [activeTab, allAppointments],
   );
 
+  const pendingReviewBookingIds = useMemo(() => {
+    const pending = (pendingReviewsQuery ?? []) as PendingReviewEntry[];
+    return new Set(pending.map((entry) => entry.bookingId));
+  }, [pendingReviewsQuery]);
+
   // ── Cancel mutation ─────────────────────────────────────────────────────
   const cancelBooking = useMutation(api.bookings.cancel);
+  const createReview = useMutation(api.reviews.create);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [isReviewSubmitting, setIsReviewSubmitting] = useState(false);
 
   // ── Handlers ────────────────────────────────────────────────────────────
 
@@ -480,9 +646,10 @@ export default function AppointmentsScreen() {
         .catch((err: Error) => {
           Alert.alert(
             'خطأ',
-            err instanceof Error
-              ? err.message
-              : 'حدث خطأ أثناء إلغاء الموعد. يرجى المحاولة مرة أخرى.',
+            getArabicErrorMessage(
+              err,
+              'حدث خطأ أثناء إلغاء الموعد. يرجى المحاولة مرة أخرى.',
+            ),
           );
         })
         .finally(() => {
@@ -518,6 +685,46 @@ export default function AppointmentsScreen() {
     [router],
   );
 
+  const handleReview = useCallback((item: EnrichedAppointment) => {
+    setReviewTarget(item);
+  }, []);
+
+  const handleSubmitReview = useCallback(
+    (rating: number, comment: string, isAnonymous: boolean) => {
+      if (!reviewTarget) return;
+
+      const trimmedComment = comment.trim();
+      setIsReviewSubmitting(true);
+      createReview({
+        bookingId: reviewTarget.id as Id<'bookings'>,
+        overallRating: rating,
+        punctualityRating: rating,
+        diagnosisRating: rating,
+        professionalismRating: rating,
+        cleanlinessRating: rating,
+        isAnonymous,
+        ...(trimmedComment ? { comment: trimmedComment } : {}),
+      })
+        .then(() => {
+          setReviewTarget(null);
+          Alert.alert('تم إرسال التقييم', 'شكراً لك على مشاركة تجربتك.');
+        })
+        .catch((err: Error) => {
+          Alert.alert(
+            'تعذر إرسال التقييم',
+            getArabicErrorMessage(
+              err,
+              'حدث خطأ أثناء إرسال التقييم. يرجى المحاولة مرة أخرى.',
+            ),
+          );
+        })
+        .finally(() => {
+          setIsReviewSubmitting(false);
+        });
+    },
+    [createReview, reviewTarget],
+  );
+
   // ── Render appointment card ─────────────────────────────────────────────
   const renderItem = useCallback(
     ({ item }: { item: EnrichedAppointment }) => (
@@ -542,10 +749,14 @@ export default function AppointmentsScreen() {
         doctorName={item.doctorName}
         specialty={item.specialty}
         clinicName={item.clinicName}
+        hasReview={
+          item.status === 'completed' && !pendingReviewBookingIds.has(item.id as Id<'bookings'>)
+        }
         onPress={() => handleCardPress(item)}
         onCancel={() => handleCancelPress(item)}
         onReschedule={() => handleReschedule(item)}
         onBookAgain={() => handleBookAgain(item)}
+        onReview={() => handleReview(item)}
       />
     ),
     [
@@ -553,6 +764,8 @@ export default function AppointmentsScreen() {
       handleCancelPress,
       handleReschedule,
       handleBookAgain,
+      handleReview,
+      pendingReviewBookingIds,
     ],
   );
 
@@ -649,6 +862,16 @@ export default function AppointmentsScreen() {
         loading={isCancelling}
         onClose={() => setCancelTarget(null)}
         onConfirm={handleConfirmCancel}
+      />
+
+      <ReviewModal
+        visible={reviewTarget !== null}
+        appointmentName={
+          reviewTarget ? `د. ${reviewTarget.doctorName}` : ''
+        }
+        loading={isReviewSubmitting}
+        onClose={() => setReviewTarget(null)}
+        onSubmit={handleSubmitReview}
       />
     </SafeAreaView>
   );
@@ -838,12 +1061,99 @@ const styles = StyleSheet.create({
   modalButtonDanger: {
     backgroundColor: theme.colors.danger,
   },
+  modalButtonPrimary: {
+    backgroundColor: theme.colors.primary,
+  },
   modalButtonDangerText: {
+    fontFamily: theme.typography.fontFamily.arabicBold,
+    fontSize: 15,
+    color: theme.colors.white,
+  },
+  modalButtonPrimaryText: {
     fontFamily: theme.typography.fontFamily.arabicBold,
     fontSize: 15,
     color: theme.colors.white,
   },
   modalButtonDisabled: {
     opacity: 0.5,
+  },
+  ratingPicker: {
+    flexDirection: 'row-reverse',
+    justifyContent: 'center',
+    gap: theme.spacing.sm,
+    marginBottom: theme.spacing.lg,
+  },
+  starButton: {
+    width: 42,
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: theme.borderRadius.sm,
+  },
+  starButtonPressed: {
+    backgroundColor: theme.colors.background,
+  },
+  starText: {
+    fontSize: 32,
+    color: theme.colors.border,
+  },
+  starTextSelected: {
+    color: theme.colors.warning,
+  },
+  reviewInput: {
+    backgroundColor: theme.colors.background,
+    borderRadius: theme.borderRadius.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.md,
+    fontFamily: theme.typography.fontFamily.arabic,
+    fontSize: 14,
+    color: theme.colors.textPrimary,
+    minHeight: 96,
+    marginBottom: theme.spacing.lg,
+    textAlign: 'right',
+    writingDirection: 'rtl',
+  },
+  anonymousOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.borderRadius.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    marginBottom: theme.spacing.lg,
+  },
+  anonymousOptionSelected: {
+    borderColor: theme.colors.primary,
+    backgroundColor: theme.colors.secondary,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: theme.colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: theme.spacing.md,
+  },
+  checkboxSelected: {
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
+  },
+  checkboxMark: {
+    color: theme.colors.white,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  anonymousText: {
+    flex: 1,
+    fontFamily: theme.typography.fontFamily.arabic,
+    fontSize: 14,
+    color: theme.colors.textPrimary,
+    textAlign: 'right',
+    writingDirection: 'rtl',
   },
 });

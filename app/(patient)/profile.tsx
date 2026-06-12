@@ -12,7 +12,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   View,
@@ -26,8 +25,8 @@ import { useMutation, useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { theme } from '@/lib/theme';
 import { rtlTextAlign } from '@/lib/rtl';
+import { getArabicErrorMessage } from '@/lib/errorMessages';
 import { useAuthStore } from '@/stores/authStore';
-import { useLanguageStore } from '@/stores/languageStore';
 import type { PatientProfile } from '@/lib/types';
 import type { Id } from '@/convex/_generated/dataModel';
 
@@ -269,28 +268,52 @@ export default function PatientProfileScreen() {
   const { signOut } = useAuthActions();
   const me = useQuery(api.users.me, {});
   const familyProfilesQuery = useQuery(api.patientProfiles.listMy, {});
+  const wilayasQuery = useQuery(api.locations.listWilayas, {});
   const updateProfile = useMutation(api.users.updateProfile);
+  const completePatientProfile = useMutation(api.users.completePatientProfile);
   const createFamilyProfile = useMutation(api.patientProfiles.create);
   const user = me?.role === 'patient' ? me : null;
   const clearUser = useAuthStore((s) => s.clearUser);
-  const { language, setLanguage } = useLanguageStore();
-  const [themeEnabled, setThemeEnabled] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
+  const [completeProfileModalVisible, setCompleteProfileModalVisible] =
+    useState(false);
   const [familyModalVisible, setFamilyModalVisible] = useState(false);
   const [privacyModalVisible, setPrivacyModalVisible] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [profileName, setProfileName] = useState('');
   const [profilePhone, setProfilePhone] = useState('');
+  const [completionDateOfBirth, setCompletionDateOfBirth] = useState('');
+  const [completionGender, setCompletionGender] = useState<'male' | 'female'>(
+    'male',
+  );
+  const [completionWilayaId, setCompletionWilayaId] =
+    useState<Id<'wilayas'> | null>(null);
+  const [completionCommuneId, setCompletionCommuneId] =
+    useState<Id<'communes'> | null>(null);
   const [familyName, setFamilyName] = useState('');
   const [familyDateOfBirth, setFamilyDateOfBirth] = useState('');
   const [familyGender, setFamilyGender] = useState<'male' | 'female'>('male');
   const [savingProfile, setSavingProfile] = useState(false);
+  const [savingCompletion, setSavingCompletion] = useState(false);
   const [savingFamily, setSavingFamily] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
+  const communesQuery = useQuery(
+    api.locations.listCommunesByWilaya,
+    completionWilayaId ? { wilayaId: completionWilayaId } : 'skip',
+  );
   const familyProfiles = useMemo(
     () => (familyProfilesQuery ?? []).map(toFamilyProfile),
     [familyProfilesQuery],
   );
+  const wilayas = wilayasQuery ?? [];
+  const communes = communesQuery ?? [];
+  const currentWilayaName = useMemo(() => {
+    if (!user?.wilayaId) return '-';
+    return (
+      wilayas.find((wilaya) => wilaya._id === user.wilayaId)?.nameAr ??
+      'ولاية محددة'
+    );
+  }, [user?.wilayaId, wilayas]);
 
   // ── Handlers ────────────────────────────────────────────────────────────
 
@@ -308,6 +331,15 @@ export default function PatientProfileScreen() {
     setModalError(null);
     setFamilyModalVisible(true);
   }, []);
+
+  const handleCompletePatientProfile = useCallback(() => {
+    setCompletionDateOfBirth('');
+    setCompletionGender((user?.gender as 'male' | 'female' | undefined) ?? 'male');
+    setCompletionWilayaId((user?.wilayaId as Id<'wilayas'> | undefined) ?? null);
+    setCompletionCommuneId(null);
+    setModalError(null);
+    setCompleteProfileModalVisible(true);
+  }, [user?.gender, user?.wilayaId]);
 
   const handlePrivacyPolicy = useCallback(() => {
     setPrivacyModalVisible(true);
@@ -339,12 +371,40 @@ export default function PatientProfileScreen() {
         phone: profilePhone.trim() || undefined,
       });
       setEditModalVisible(false);
-    } catch (error: any) {
-      setModalError(error?.message ?? 'تعذر حفظ المعلومات');
+    } catch (error) {
+      setModalError(getArabicErrorMessage(error, 'تعذر حفظ المعلومات'));
     } finally {
       setSavingProfile(false);
     }
   }, [profileName, profilePhone, updateProfile]);
+
+  const handleSavePatientProfile = useCallback(async () => {
+    const dateOfBirth = completionDateOfBirth.trim();
+    if (!dateOfBirth || !completionCommuneId) {
+      setModalError('تاريخ الميلاد والبلدية مطلوبان');
+      return;
+    }
+
+    setSavingCompletion(true);
+    setModalError(null);
+    try {
+      await completePatientProfile({
+        dateOfBirth,
+        gender: completionGender,
+        communeId: completionCommuneId,
+      });
+      setCompleteProfileModalVisible(false);
+    } catch (error) {
+      setModalError(getArabicErrorMessage(error, 'تعذر إكمال الملف الطبي'));
+    } finally {
+      setSavingCompletion(false);
+    }
+  }, [
+    completePatientProfile,
+    completionCommuneId,
+    completionDateOfBirth,
+    completionGender,
+  ]);
 
   const handleSaveFamilyMember = useCallback(async () => {
     const fullNameAr = familyName.trim();
@@ -365,8 +425,8 @@ export default function PatientProfileScreen() {
         allergies: [],
       });
       setFamilyModalVisible(false);
-    } catch (error: any) {
-      setModalError(error?.message ?? 'تعذر إضافة فرد العائلة');
+    } catch (error) {
+      setModalError(getArabicErrorMessage(error, 'تعذر إضافة فرد العائلة'));
     } finally {
       setSavingFamily(false);
     }
@@ -431,6 +491,36 @@ export default function PatientProfileScreen() {
           </Text>
         </View>
 
+        {!user.profile ? (
+          <View style={styles.completeProfileCard}>
+            <View style={styles.completeProfileIcon}>
+              <Ionicons
+                name="medical-outline"
+                size={24}
+                color={theme.colors.warning}
+              />
+            </View>
+            <View style={styles.completeProfileTextArea}>
+              <Text style={styles.completeProfileTitle}>أكمل ملفك الطبي</Text>
+              <Text style={styles.completeProfileDescription}>
+                أكمل تاريخ الميلاد والبلدية حتى تتمكن من الحجز وإضافة الأطباء
+                إلى المفضلة.
+              </Text>
+            </View>
+            <Pressable
+              onPress={handleCompletePatientProfile}
+              style={({ pressed }) => [
+                styles.completeProfileButton,
+                pressed && styles.editButtonPressed,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="أكمل ملفك الطبي"
+            >
+              <Text style={styles.completeProfileButtonText}>إكمال</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
         {/* ── Personal Info Section ───────────────────────────── */}
         <ProfileSection title="معلوماتي الشخصية">
           <ProfileRow
@@ -451,7 +541,7 @@ export default function PatientProfileScreen() {
           <ProfileRow
             icon="location-outline"
             label="الولاية"
-            value={user.wilayaId ?? '-'}
+            value={currentWilayaName}
             isLast
           />
           <View style={styles.editButtonContainer}>
@@ -522,60 +612,21 @@ export default function PatientProfileScreen() {
           <ProfileRow
             icon="language-outline"
             label="اللغة"
+            value="العربية"
             rightElement={
-              <View style={styles.languageToggle}>
-                <Pressable
-                  onPress={() => setLanguage('ar')}
-                  style={[
-                    styles.languageOption,
-                    language === 'ar' && styles.languageOptionActive,
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityLabel="العربية"
-                >
-                  <Text
-                    style={[
-                      styles.langText,
-                      language === 'ar' && styles.langTextActive,
-                    ]}
-                  >
-                    AR
-                  </Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => setLanguage('fr')}
-                  style={[
-                    styles.languageOption,
-                    language === 'fr' && styles.languageOptionActive,
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Français"
-                >
-                  <Text
-                    style={[
-                      styles.langText,
-                      language === 'fr' && styles.langTextActive,
-                    ]}
-                  >
-                    FR
-                  </Text>
-                </Pressable>
+              <View style={styles.settingsUnavailableBadge}>
+                <Text style={styles.settingsUnavailableBadgeText}>غير متاح</Text>
               </View>
             }
           />
           <ProfileRow
             icon="moon-outline"
             label="الوضع المظلم"
+            value="غير مفعل"
             rightElement={
-              <Switch
-                value={themeEnabled}
-                onValueChange={setThemeEnabled}
-                trackColor={{
-                  false: theme.colors.border,
-                  true: theme.colors.primary,
-                }}
-                thumbColor={theme.colors.white}
-              />
+              <View style={styles.settingsUnavailableBadge}>
+                <Text style={styles.settingsUnavailableBadgeText}>غير متاح</Text>
+              </View>
             }
             isLast
           />
@@ -646,6 +697,148 @@ export default function PatientProfileScreen() {
           >
             <Text style={styles.modalPrimaryButtonText}>
               {savingProfile ? 'جاري الحفظ...' : 'حفظ'}
+            </Text>
+          </Pressable>
+        </View>
+      </ActionModal>
+
+      <ActionModal
+        visible={completeProfileModalVisible}
+        title="أكمل ملفك الطبي"
+        onClose={() => setCompleteProfileModalVisible(false)}
+      >
+        <View style={styles.modalBody}>
+          {modalError ? <Text style={styles.modalErrorText}>{modalError}</Text> : null}
+
+          <Text style={styles.modalFieldLabel}>تاريخ الميلاد</Text>
+          <TextInput
+            style={styles.modalInput}
+            value={completionDateOfBirth}
+            onChangeText={setCompletionDateOfBirth}
+            placeholder="YYYY-MM-DD"
+            placeholderTextColor={theme.colors.textSecondary}
+            textAlign="right"
+          />
+
+          <Text style={styles.modalFieldLabel}>الجنس</Text>
+          <View style={styles.genderRow}>
+            <Pressable
+              onPress={() => setCompletionGender('male')}
+              style={[
+                styles.genderChip,
+                completionGender === 'male' && styles.genderChipActive,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="ذكر"
+            >
+              <Text
+                style={[
+                  styles.genderChipText,
+                  completionGender === 'male' && styles.genderChipTextActive,
+                ]}
+              >
+                ذكر
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setCompletionGender('female')}
+              style={[
+                styles.genderChip,
+                completionGender === 'female' && styles.genderChipActive,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="أنثى"
+            >
+              <Text
+                style={[
+                  styles.genderChipText,
+                  completionGender === 'female' && styles.genderChipTextActive,
+                ]}
+              >
+                أنثى
+              </Text>
+            </Pressable>
+          </View>
+
+          <Text style={styles.modalFieldLabel}>الولاية</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.optionChipsRow}
+          >
+            {wilayas.map((wilaya) => {
+              const isSelected = completionWilayaId === wilaya._id;
+              return (
+                <Pressable
+                  key={wilaya._id}
+                  onPress={() => {
+                    setCompletionWilayaId(wilaya._id);
+                    setCompletionCommuneId(null);
+                  }}
+                  style={[
+                    styles.optionChip,
+                    isSelected && styles.optionChipActive,
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={wilaya.nameAr}
+                >
+                  <Text
+                    style={[
+                      styles.optionChipText,
+                      isSelected && styles.optionChipTextActive,
+                    ]}
+                  >
+                    {wilaya.nameAr}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          <Text style={styles.modalFieldLabel}>البلدية</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.optionChipsRow}
+          >
+            {communes.map((commune) => {
+              const isSelected = completionCommuneId === commune._id;
+              return (
+                <Pressable
+                  key={commune._id}
+                  onPress={() => setCompletionCommuneId(commune._id)}
+                  style={[
+                    styles.optionChip,
+                    isSelected && styles.optionChipActive,
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={commune.nameAr}
+                >
+                  <Text
+                    style={[
+                      styles.optionChipText,
+                      isSelected && styles.optionChipTextActive,
+                    ]}
+                  >
+                    {commune.nameAr}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          <Pressable
+            onPress={handleSavePatientProfile}
+            disabled={savingCompletion}
+            style={({ pressed }) => [
+              styles.modalPrimaryButton,
+              (pressed || savingCompletion) && styles.modalButtonPressed,
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="حفظ الملف الطبي"
+          >
+            <Text style={styles.modalPrimaryButtonText}>
+              {savingCompletion ? 'جاري الحفظ...' : 'حفظ الملف الطبي'}
             </Text>
           </Pressable>
         </View>
@@ -873,6 +1066,56 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
+  completeProfileCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF8E1',
+    borderWidth: 1,
+    borderColor: '#F8D47A',
+    borderRadius: theme.borderRadius.lg,
+    marginHorizontal: theme.spacing.lg,
+    marginBottom: theme.spacing.lg,
+    padding: theme.spacing.md,
+  },
+  completeProfileIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: theme.colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: theme.spacing.md,
+  },
+  completeProfileTextArea: {
+    flex: 1,
+  },
+  completeProfileTitle: {
+    fontFamily: theme.typography.fontFamily.arabicBold,
+    fontSize: 15,
+    color: theme.colors.textPrimary,
+    textAlign: rtlTextAlign(),
+  },
+  completeProfileDescription: {
+    fontFamily: theme.typography.fontFamily.arabic,
+    fontSize: 12,
+    color: theme.colors.textSecondary,
+    lineHeight: 18,
+    marginTop: 2,
+    textAlign: rtlTextAlign(),
+  },
+  completeProfileButton: {
+    backgroundColor: theme.colors.warning,
+    borderRadius: theme.borderRadius.md,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    marginRight: theme.spacing.sm,
+  },
+  completeProfileButtonText: {
+    fontFamily: theme.typography.fontFamily.arabicBold,
+    fontSize: 13,
+    color: theme.colors.white,
+  },
+
   // ── Section ──────────────────────────────────────────────────────────────
   sectionContainer: {
     marginBottom: theme.spacing.lg,
@@ -1042,35 +1285,21 @@ const styles = StyleSheet.create({
     color: theme.colors.primary,
   },
 
-  // ── Language Toggle ──────────────────────────────────────────────────────
-  languageToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.md,
-    overflow: 'hidden',
-  },
-  languageOption: {
-    minWidth: 44,
+  // ── Disabled Settings ────────────────────────────────────────────────────
+  settingsUnavailableBadge: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: theme.spacing.sm,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.background,
+    paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.xs,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
-  languageOptionActive: {
-    backgroundColor: theme.colors.secondary,
-  },
-  langText: {
+  settingsUnavailableBadgeText: {
     fontFamily: theme.typography.fontFamily.arabicBold,
-    fontSize: 13,
+    fontSize: 12,
     color: theme.colors.textSecondary,
-  },
-  langTextActive: {
-    color: theme.colors.primary,
-  },
-  switch: {
-    transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }],
   },
 
   // ── Modals ───────────────────────────────────────────────────────────────
@@ -1198,6 +1427,32 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
   },
   genderChipTextActive: {
+    fontFamily: theme.typography.fontFamily.arabicBold,
+    color: theme.colors.primary,
+  },
+  optionChipsRow: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+    paddingBottom: theme.spacing.md,
+  },
+  optionChip: {
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.md,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    backgroundColor: theme.colors.white,
+  },
+  optionChipActive: {
+    backgroundColor: theme.colors.secondary,
+    borderColor: theme.colors.primary,
+  },
+  optionChipText: {
+    fontFamily: theme.typography.fontFamily.arabic,
+    fontSize: 13,
+    color: theme.colors.textSecondary,
+  },
+  optionChipTextActive: {
     fontFamily: theme.typography.fontFamily.arabicBold,
     color: theme.colors.primary,
   },

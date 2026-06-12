@@ -30,6 +30,7 @@ export default defineSchema({
     tokenIdentifier: v.optional(v.string()),
     fullNameAr: v.optional(v.string()),
     fullNameFr: v.optional(v.string()),
+    gender: v.optional(v.union(v.literal("male"), v.literal("female"))),
     role: v.optional(
       v.union(
         v.literal("patient"),

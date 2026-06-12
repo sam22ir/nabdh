@@ -18,6 +18,7 @@ const userFields = {
   image: v.optional(v.string()),
   fullNameAr: v.optional(v.string()),
   fullNameFr: v.optional(v.string()),
+  gender: v.optional(v.union(v.literal("male"), v.literal("female"))),
   role: v.optional(
     v.union(
       v.literal("patient"),
@@ -138,6 +139,7 @@ export const me = query({
       image: user.image,
       fullNameAr: user.fullNameAr,
       fullNameFr: user.fullNameFr,
+      gender: user.gender,
       role: user.role,
       wilayaId: user.wilayaId,
       avatarUrl: user.avatarUrl,
@@ -188,6 +190,7 @@ export const getProfile = query({
       image: user.image,
       fullNameAr: user.fullNameAr,
       fullNameFr: user.fullNameFr,
+      gender: user.gender,
       role: user.role,
       wilayaId: user.wilayaId,
       avatarUrl: user.avatarUrl,
@@ -357,6 +360,82 @@ export const updateProfile = mutation({
     }
 
     return userId;
+  },
+});
+
+/**
+ * Creates the missing core patient profile for an authenticated patient user.
+ * This repairs accounts that completed auth but do not yet have a `patients`
+ * row, which booking and favorites require.
+ */
+export const completePatientProfile = mutation({
+  args: {
+    dateOfBirth: v.string(),
+    gender: v.union(v.literal("male"), v.literal("female")),
+    communeId: v.id("communes"),
+    bloodType: v.optional(
+      v.union(
+        v.literal("A+"),
+        v.literal("A-"),
+        v.literal("B+"),
+        v.literal("B-"),
+        v.literal("AB+"),
+        v.literal("AB-"),
+        v.literal("O+"),
+        v.literal("O-"),
+      ),
+    ),
+    chronicDiseases: v.optional(v.array(v.string())),
+    allergies: v.optional(v.array(v.string())),
+  },
+  returns: v.id("patients"),
+  handler: async (ctx, args) => {
+    const userId = await getAuthedUserId(ctx);
+    const user = await ctx.db.get(userId);
+    if (!user) {
+      throw new ConvexError("User not found.");
+    }
+    if (user.role && user.role !== "patient") {
+      throw new ConvexError("Only patient accounts can complete a patient profile.");
+    }
+
+    const existingDoctor = await ctx.db
+      .query("doctors")
+      .withIndex("by_userId", (q: any) => q.eq("userId", userId))
+      .first();
+    if (existingDoctor) {
+      throw new ConvexError("Doctor accounts cannot create patient profiles.");
+    }
+
+    const commune = await ctx.db.get(args.communeId);
+    if (!commune) {
+      throw new ConvexError("Commune not found.");
+    }
+
+    const existingPatient = await ctx.db
+      .query("patients")
+      .withIndex("by_userId", (q: any) => q.eq("userId", userId))
+      .first();
+    if (existingPatient) {
+      return existingPatient._id;
+    }
+
+    await ctx.db.patch(userId, {
+      role: "patient",
+      gender: args.gender,
+      wilayaId: commune.wilayaId,
+      isActive: true,
+    });
+
+    return await ctx.db.insert("patients", {
+      userId,
+      dateOfBirth: args.dateOfBirth,
+      gender: args.gender,
+      communeId: args.communeId,
+      bloodType: args.bloodType,
+      chronicDiseases: args.chronicDiseases ?? [],
+      allergies: args.allergies ?? [],
+    });
   },
 });
 

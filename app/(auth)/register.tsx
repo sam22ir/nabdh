@@ -23,6 +23,7 @@ import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { theme } from '../../src/lib/theme';
 import { rtlValue } from '../../src/lib/rtl';
+import { getArabicErrorMessage } from '../../src/lib/errorMessages';
 import type { UserRole } from '../../src/lib/types';
 import type { Id } from '../../convex/_generated/dataModel';
 
@@ -318,7 +319,10 @@ export default function RegisterScreen() {
         setServerError(
           err?.message?.includes('already')
             ? 'البريد الإلكتروني مستخدم بالفعل'
-            : err?.message ?? 'حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.',
+            : getArabicErrorMessage(
+                err,
+                'حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.',
+              ),
         );
       } finally {
         setSubmitting(false);

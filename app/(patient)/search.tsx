@@ -2,7 +2,7 @@
 // Imports
 // =============================================================================
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -18,7 +18,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, usePaginatedQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
@@ -28,6 +28,7 @@ import SearchBar from '@/components/SearchBar';
 import EmptyState from '@/components/EmptyState';
 import { theme } from '@/lib/theme';
 import { rtlTextAlign } from '@/lib/rtl';
+import { routeParamString } from '@/lib/routeParams';
 import type { Id } from '@/convex/_generated/dataModel';
 
 // =============================================================================
@@ -54,7 +55,6 @@ function toDoctorCardData(r: {
   avgRating: number;
   totalReviews: number;
   isVerified: boolean;
-  // The Convex data doesn't have wilaya info directly on the card
 }): DoctorCardData {
   return {
     id: r._id,
@@ -212,13 +212,16 @@ const ItemSeparator: React.FC = () => <View style={styles.separator} />;
 
 export default function PatientSearchScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ specialty?: string | string[] }>();
+  const specialtyParam = routeParamString(params.specialty);
 
   // ── Filter state ──────────────────────────────────────────────────────────
   const [searchText, setSearchText] = useState('');
-  const [selectedWilayaId, setSelectedWilayaId] = useState<string | null>(null);
+  const [selectedWilayaId, setSelectedWilayaId] =
+    useState<Id<'wilayas'> | null>(null);
   const [selectedSpecialtyId, setSelectedSpecialtyId] = useState<
     Id<'specialties'> | undefined
-  >(undefined);
+  >((specialtyParam ?? undefined) as Id<'specialties'> | undefined);
   const [genderFilter, setGenderFilter] = useState<GenderValue | null>(null);
   const [availableTodayOnly, setAvailableTodayOnly] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
@@ -230,6 +233,7 @@ export default function PatientSearchScreen() {
 
   // ── Data queries ──────────────────────────────────────────────────────────
   const specialties = useQuery(api.specialties.list, {});
+  const wilayas = useQuery(api.locations.listWilayas, {});
   const specialtyOptions: FlatOption[] = useMemo(
     () =>
       specialties?.map((specialty) => ({
@@ -238,6 +242,20 @@ export default function PatientSearchScreen() {
       })) ?? [],
     [specialties],
   );
+  const wilayaOptions: FlatOption[] = useMemo(
+    () =>
+      wilayas?.map((wilaya) => ({
+        id: wilaya._id,
+        nameAr: wilaya.nameAr,
+      })) ?? [],
+    [wilayas],
+  );
+
+  useEffect(() => {
+    setSelectedSpecialtyId(
+      (specialtyParam ?? undefined) as Id<'specialties'> | undefined,
+    );
+  }, [specialtyParam]);
 
   // Load doctors with optional structural filters
   // Uses Convex paginated query — loads initial page, can load more
@@ -250,9 +268,10 @@ export default function PatientSearchScreen() {
     api.doctors.listPublic,
     {
       specialtyId: selectedSpecialtyId,
-      wilayaId: undefined,    // Not using structural filters until we have proper IDs
+      wilayaId: selectedWilayaId ?? undefined,
       gender: genderFilter ?? undefined,
       language: undefined,
+      availableToday: availableTodayOnly || undefined,
     },
     { initialNumItems: 20 },
   );
@@ -266,7 +285,16 @@ export default function PatientSearchScreen() {
     isLoading: searchLoading,
   } = usePaginatedQuery(
     api.doctors.search,
-    searchQueryText ? { query: searchQueryText } : 'skip',
+    searchQueryText
+      ? {
+          query: searchQueryText,
+          specialtyId: selectedSpecialtyId,
+          wilayaId: selectedWilayaId ?? undefined,
+          gender: genderFilter ?? undefined,
+          language: undefined,
+          availableToday: availableTodayOnly || undefined,
+        }
+      : 'skip',
     { initialNumItems: 20 },
   );
 
@@ -279,6 +307,10 @@ export default function PatientSearchScreen() {
   const selectedSpecialty = useMemo(
     () => specialtyOptions.find((s) => s.id === selectedSpecialtyId),
     [selectedSpecialtyId, specialtyOptions],
+  );
+  const selectedWilaya = useMemo(
+    () => wilayaOptions.find((w) => w.id === selectedWilayaId),
+    [selectedWilayaId, wilayaOptions],
   );
 
   const filteredDoctors = useMemo(() => {
@@ -337,6 +369,11 @@ export default function PatientSearchScreen() {
     setSearchText('');
   }, []);
 
+  const handleWilayaSelect = useCallback((val: string | null) => {
+    setSelectedWilayaId(val as Id<'wilayas'> | null);
+    setSearchText('');
+  }, []);
+
   const handleGenderToggle = useCallback(() => {
     setGenderFilter((prev) => {
       if (prev === null) return 'male';
@@ -354,7 +391,7 @@ export default function PatientSearchScreen() {
     ({ item }: ListRenderItemInfo<any>) => (
       <DoctorCard
         doctor={toDoctorCardData(item)}
-        isAvailableToday={false}
+        isAvailableToday={item.isAvailableToday}
         onPress={() => handleDoctorPress(item._id)}
       />
     ),
@@ -423,6 +460,37 @@ export default function PatientSearchScreen() {
             size={14}
             color={
               selectedSpecialtyId !== undefined
+                ? theme.colors.white
+                : theme.colors.textSecondary
+            }
+          />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.chip,
+            selectedWilayaId !== null && styles.chipActive,
+          ]}
+          onPress={() => setShowWilayaPicker(true)}
+          accessibilityRole="button"
+          accessibilityLabel="تصفية حسب الولاية"
+        >
+          <Text
+            style={[
+              styles.chipText,
+              selectedWilayaId !== null && styles.chipTextActive,
+            ]}
+            numberOfLines={1}
+          >
+            {selectedWilayaId !== null
+              ? selectedWilaya?.nameAr ?? 'الولاية'
+              : 'الولاية'}
+          </Text>
+          <Ionicons
+            name="chevron-down"
+            size={14}
+            color={
+              selectedWilayaId !== null
                 ? theme.colors.white
                 : theme.colors.textSecondary
             }
@@ -576,6 +644,23 @@ export default function PatientSearchScreen() {
 
               <TouchableOpacity
                 style={styles.filterPanelRow}
+                onPress={() => {
+                  setFilterModalVisible(false);
+                  setShowWilayaPicker(true);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="تصفية حسب الولاية"
+              >
+                <Text style={styles.filterPanelLabel}>الولاية</Text>
+                <Text style={styles.filterPanelValue}>
+                  {selectedWilayaId
+                    ? selectedWilaya?.nameAr ?? 'مختارة'
+                    : 'الكل'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.filterPanelRow}
                 onPress={handleGenderToggle}
                 accessibilityRole="button"
                 accessibilityLabel="تصفية حسب الجنس"
@@ -632,6 +717,15 @@ export default function PatientSearchScreen() {
         selectedValue={selectedSpecialtyId ?? null}
         onSelect={handleSpecialtySelect}
         onClose={() => setShowSpecialtyPicker(false)}
+      />
+
+      <DropdownPicker
+        visible={showWilayaPicker}
+        title="اختر الولاية"
+        options={wilayaOptions}
+        selectedValue={selectedWilayaId}
+        onSelect={handleWilayaSelect}
+        onClose={() => setShowWilayaPicker(false)}
       />
     </SafeAreaView>
   );
