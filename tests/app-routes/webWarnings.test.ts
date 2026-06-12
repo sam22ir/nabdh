@@ -26,4 +26,11 @@ describe("React Native Web warning cleanup", () => {
     expect(searchSource).not.toMatch(/<Pressable\s+style=\{styles\.modalOverlay\}/);
     expect(registerSource).not.toMatch(/<Pressable\s+style=\{fieldStyles\.modalOverlay\}/);
   });
+
+  test("appointment cards with action buttons do not nest buttons", () => {
+    const appointmentCardSource = source("src/components/AppointmentCard.tsx");
+
+    expect(appointmentCardSource).toContain("if (showActions) {");
+    expect(appointmentCardSource).toContain("<View style={styles.card}>");
+  });
 });

@@ -32,4 +32,12 @@ describe("registration submission", () => {
     expect(source).toContain("dateOfBirth: data.dateOfBirth");
     expect(source).toContain("gender: data.gender");
   });
+
+  test("waits for the Convex Auth handshake before completing registration", () => {
+    const source = registerSource();
+
+    expect(source).toContain("useConvexAuth");
+    expect(source).toContain("pendingRegistration");
+    expect(source).not.toMatch(/await signIn\([\s\S]*await registerUser\(/);
+  });
 });

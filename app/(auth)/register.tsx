@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -19,7 +19,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthActions } from '@convex-dev/auth/react';
-import { useMutation, useQuery } from 'convex/react';
+import { useConvexAuth, useMutation, useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { theme } from '../../src/lib/theme';
 import { rtlValue } from '../../src/lib/rtl';
@@ -71,6 +71,31 @@ const fullSchema = z.object({
 }).superRefine(passwordMatchRefine);
 
 type FormData = z.output<typeof fullSchema>;
+
+type RegistrationPayload = {
+  fullNameAr: string;
+  role: UserRole;
+  wilayaId: Id<'wilayas'>;
+  communeId?: Id<'communes'>;
+  dateOfBirth?: string;
+  gender?: 'male' | 'female';
+};
+
+function getRegistrationErrorMessage(err: unknown) {
+  const message =
+    err instanceof Error
+      ? err.message
+      : typeof err === 'string'
+        ? err
+        : '';
+
+  return message.includes('already')
+    ? 'البريد الإلكتروني مستخدم بالفعل'
+    : getArabicErrorMessage(
+        err,
+        'حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.',
+      );
+}
 
 // =============================================================================
 // Reusable select option type
@@ -188,6 +213,7 @@ export default function RegisterScreen() {
   const router = useRouter();
   const { role } = useLocalSearchParams<{ role?: UserRole }>();
   const { signIn } = useAuthActions();
+  const { isAuthenticated, isLoading: authLoading } = useConvexAuth();
   const registerUser = useMutation(api.users.register);
   const wilayas = useQuery(api.locations.listWilayas, {});
 
@@ -195,6 +221,9 @@ export default function RegisterScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const [roleReady, setRoleReady] = useState(false);
+  const [pendingRegistration, setPendingRegistration] =
+    useState<RegistrationPayload | null>(null);
+  const completingRegistrationRef = useRef(false);
 
   const {
     control,
@@ -273,6 +302,42 @@ export default function RegisterScreen() {
     }
   }, [trigger]);
 
+  useEffect(() => {
+    if (
+      pendingRegistration == null ||
+      authLoading ||
+      !isAuthenticated ||
+      completingRegistrationRef.current
+    ) {
+      return;
+    }
+
+    completingRegistrationRef.current = true;
+    void (async () => {
+      try {
+        await registerUser(pendingRegistration);
+
+        if (pendingRegistration.role === 'patient') {
+          router.replace('/(patient)');
+        } else {
+          router.replace('/(doctor)/dashboard');
+        }
+      } catch (err) {
+        setServerError(getRegistrationErrorMessage(err));
+      } finally {
+        completingRegistrationRef.current = false;
+        setPendingRegistration(null);
+        setSubmitting(false);
+      }
+    })();
+  }, [
+    authLoading,
+    isAuthenticated,
+    pendingRegistration,
+    registerUser,
+    router,
+  ]);
+
   // Final submission
   const onSubmit = useCallback(
     async (data: FormData) => {
@@ -282,22 +347,16 @@ export default function RegisterScreen() {
       try {
         if (role === 'patient' && !data.dateOfBirth?.trim()) {
           setServerError('يرجى إدخال تاريخ الميلاد');
+          setSubmitting(false);
           return;
         }
         if (role === 'patient' && !data.gender) {
           setServerError('يرجى اختيار الجنس');
+          setSubmitting(false);
           return;
         }
 
-        // 1. Create auth user via Convex Auth (password provider)
-        await signIn('password', {
-          email: data.email,
-          password: data.password,
-          flow: 'signUp',
-        });
-
-        // 2. Complete registration (set name, role, wilaya, etc.)
-        await registerUser({
+        const registrationPayload: RegistrationPayload = {
           fullNameAr: data.fullName.trim(),
           role: role ?? 'patient',
           wilayaId: data.wilayaId as Id<'wilayas'>,
@@ -307,28 +366,25 @@ export default function RegisterScreen() {
               : undefined,
           dateOfBirth: data.dateOfBirth,
           gender: data.gender,
+        };
+
+        const signInResult = await signIn('password', {
+          email: data.email,
+          password: data.password,
+          flow: 'signUp',
         });
 
-        // 3. Navigate to the appropriate shell
-        if (role === 'patient') {
-          router.replace('/(patient)');
-        } else {
-          router.replace('/(doctor)/dashboard');
+        if (!signInResult.signingIn) {
+          throw new Error('Sign up did not complete.');
         }
+
+        setPendingRegistration(registrationPayload);
       } catch (err: any) {
-        setServerError(
-          err?.message?.includes('already')
-            ? 'البريد الإلكتروني مستخدم بالفعل'
-            : getArabicErrorMessage(
-                err,
-                'حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.',
-              ),
-        );
-      } finally {
+        setServerError(getRegistrationErrorMessage(err));
         setSubmitting(false);
       }
     },
-    [role, router, signIn, registerUser],
+    [role, signIn],
   );
 
   // Don't render until role is validated

@@ -115,13 +115,8 @@ export default function AppointmentCard({
 
   // ── Render ──────────────────────────────────────────────────────────────
 
-  return (
-    <Pressable
-      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={`موعد مع الدكتور ${doctorName}`}
-    >
+  const cardContent = (
+    <>
       {/* Header: Doctor name + status badge */}
       <View style={styles.header}>
         <Text style={styles.doctorName} numberOfLines={1}>
@@ -233,6 +228,21 @@ export default function AppointmentCard({
           )}
         </View>
       )}
+    </>
+  );
+
+  if (showActions) {
+    return <View style={styles.card}>{cardContent}</View>;
+  }
+
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`موعد مع الدكتور ${doctorName}`}
+    >
+      {cardContent}
     </Pressable>
   );
 }
