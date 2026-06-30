@@ -13,6 +13,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuthActions } from '@convex-dev/auth/react';
 
+import {
+  DoctorHeader,
+  DoctorSection,
+  SegmentedControl,
+  type SegmentOption,
+} from '@/components/doctor-ui';
 import { theme } from '@/lib/theme';
 import { rtlTextAlign } from '@/lib/rtl';
 import { useAuthStore } from '@/stores/authStore';
@@ -30,6 +36,13 @@ const MIN_HOURS_OPTIONS: Array<{ label: string; value: number }> = [
   { label: '12 ساعة', value: 12 },
   { label: '24 ساعة', value: 24 },
   { label: '48 ساعة', value: 48 },
+];
+
+type SettingsPanel = 'alerts' | 'policy';
+
+const SETTINGS_PANEL_OPTIONS: SegmentOption<SettingsPanel>[] = [
+  { key: 'alerts', label: 'التنبيهات', icon: 'notifications-outline' },
+  { key: 'policy', label: 'الحجز', icon: 'calendar-outline' },
 ];
 
 // =============================================================================
@@ -59,27 +72,6 @@ interface DestructiveRowProps {
 // =============================================================================
 // Sub-components
 // =============================================================================
-
-// ── Section Header ──────────────────────────────────────────────────────────
-
-interface SectionHeaderProps {
-  title: string;
-  icon?: keyof typeof Ionicons.glyphMap;
-}
-
-const SectionHeader: React.FC<SectionHeaderProps> = ({ title, icon }) => (
-  <View style={styles.sectionHeader}>
-    {icon ? (
-      <Ionicons
-        name={icon}
-        size={18}
-        color={theme.colors.primary}
-        style={styles.sectionHeaderIcon}
-      />
-    ) : null}
-    <Text style={styles.sectionTitle}>{title}</Text>
-  </View>
-);
 
 // ── Toggle Row ──────────────────────────────────────────────────────────────
 
@@ -118,6 +110,18 @@ const ToggleRow: React.FC<ToggleRowProps> = ({
       }}
       thumbColor={theme.colors.white}
       ios_backgroundColor={theme.colors.border}
+      accessibilityLabel={label}
+      pointerEvents="none"
+    />
+    <Pressable
+      style={({ pressed }) => [
+        styles.toggleRowPressTarget,
+        pressed && !disabled && styles.toggleRowPressed,
+      ]}
+      onPress={() => onValueChange(!value)}
+      disabled={disabled}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: value, disabled }}
       accessibilityLabel={label}
     />
   </View>
@@ -185,12 +189,13 @@ const ActionModal: React.FC<ActionModalProps> = ({
     animationType="fade"
     onRequestClose={onClose}
   >
-    <Pressable
-      style={styles.modalOverlay}
-      onPress={onClose}
-      accessibilityRole="button"
-      accessibilityLabel="إغلاق"
-    >
+    <View style={styles.modalOverlay}>
+      <Pressable
+        style={styles.modalBackdrop}
+        onPress={onClose}
+        accessibilityRole="button"
+        accessibilityLabel="إغلاق"
+      />
       <View
         style={styles.modalContent}
         onStartShouldSetResponder={() => true}
@@ -212,7 +217,7 @@ const ActionModal: React.FC<ActionModalProps> = ({
         </View>
         {children}
       </View>
-    </Pressable>
+    </View>
   </Modal>
 );
 
@@ -289,6 +294,7 @@ export default function DoctorSettingsScreen() {
 
   const [privacyModalVisible, setPrivacyModalVisible] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+  const [activePanel, setActivePanel] = useState<SettingsPanel>('alerts');
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
@@ -321,76 +327,90 @@ export default function DoctorSettingsScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      {/* ── Header ───────────────────────────────────────────────── */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>الإعدادات</Text>
-      </View>
-
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* ──────────────────────────────────────────────────────── */}
-        {/* Notification Settings Section                            */}
-        {/* ──────────────────────────────────────────────────────── */}
-        <SectionHeader title="إعدادات الإشعارات" icon="notifications-outline" />
+        <DoctorHeader
+          eyebrow="تفضيلات التشغيل"
+          title="الإعدادات"
+          subtitle="تحكم في تنبيهات العيادة وسياسات المواعيد بدون تشتيت."
+          icon="settings-outline"
+        />
 
-        <View style={styles.sectionCard}>
-          <ToggleRow
-            label="تنبيهات الحجوزات الجديدة"
-            value={newBookingAlerts}
-            onValueChange={setNewBookingAlerts}
+        <DoctorSection title="تفضيلات التشغيل">
+          <SegmentedControl
+            options={SETTINGS_PANEL_OPTIONS}
+            value={activePanel}
+            onChange={setActivePanel}
           />
-          <View style={styles.rowDivider} />
-          <ToggleRow
-            label="تنبيهات الإلغاء"
-            value={cancellationAlerts}
-            onValueChange={setCancellationAlerts}
-          />
-          <View style={styles.rowDivider} />
-          <ToggleRow
-            label="الملخص اليومي"
-            value={dailySummary}
-            onValueChange={setDailySummary}
-          />
-        </View>
+        </DoctorSection>
 
-        {/* ──────────────────────────────────────────────────────── */}
-        {/* Booking Settings Section                                 */}
-        {/* ──────────────────────────────────────────────────────── */}
-        <SectionHeader title="إعدادات الحجز" icon="calendar-outline" />
+        {activePanel === 'alerts' ? (
+          <DoctorSection
+            title="إعدادات الإشعارات"
+            subtitle="اختر ما يحتاج انتباهك أثناء يوم العيادة"
+          >
+            <View style={styles.sectionCard}>
+              <ToggleRow
+                label="تنبيهات الحجوزات الجديدة"
+                value={newBookingAlerts}
+                onValueChange={setNewBookingAlerts}
+              />
+              <View style={styles.rowDivider} />
+              <ToggleRow
+                label="تنبيهات الإلغاء"
+                value={cancellationAlerts}
+                onValueChange={setCancellationAlerts}
+              />
+              <View style={styles.rowDivider} />
+              <ToggleRow
+                label="الملخص اليومي"
+                value={dailySummary}
+                onValueChange={setDailySummary}
+              />
+            </View>
+          </DoctorSection>
+        ) : null}
 
-        <View style={styles.sectionCard}>
-          <ToggleRow
-            label="التأكيد التلقائي للحجوزات"
-            value={false}
-            onValueChange={() => undefined}
-            disabled
-            disabledBadge="قريباً"
-          />
+        {activePanel === 'policy' ? (
+          <DoctorSection
+            title="سياسات المواعيد"
+            subtitle="اضبط قواعد التأكيد والإلغاء قبل موعد المريض"
+          >
+            <View style={styles.sectionCard}>
+              <ToggleRow
+                label="التأكيد التلقائي للحجوزات"
+                value={false}
+                onValueChange={() => undefined}
+                disabled
+                disabledBadge="قريباً"
+              />
 
-          <View style={styles.rowDivider} />
+              <View style={styles.rowDivider} />
 
-          <HoursPicker
-            options={MIN_HOURS_OPTIONS}
-            selectedValue={minCancelHours}
-            onSelect={setMinCancelHours}
-          />
-        </View>
+              <HoursPicker
+                options={MIN_HOURS_OPTIONS}
+                selectedValue={minCancelHours}
+                onSelect={setMinCancelHours}
+              />
+            </View>
+          </DoctorSection>
+        ) : null}
 
-        {/* ──────────────────────────────────────────────────────── */}
-        {/* Privacy Policy                                          */}
-        {/* ──────────────────────────────────────────────────────── */}
-        <SectionHeader title="سياسة الخصوصية" icon="shield-checkmark-outline" />
-
-        <View style={styles.sectionCard}>
-          <OptionRow
-            label="سياسة الخصوصية"
-            value="عرض"
-            onPress={handlePrivacyPolicy}
-          />
-        </View>
+        <DoctorSection
+          title="الحساب والخصوصية"
+          subtitle="إجراءات الحساب الحساسة تبقى منفصلة وواضحة"
+        >
+          <View style={styles.sectionCard}>
+            <OptionRow
+              label="سياسة الخصوصية"
+              value="عرض"
+              onPress={handlePrivacyPolicy}
+            />
+          </View>
+        </DoctorSection>
 
         {/* ──────────────────────────────────────────────────────── */}
         {/* Logout                                                   */}
@@ -568,6 +588,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    position: 'relative',
+  },
+  toggleRowPressTarget: {
+    ...StyleSheet.absoluteFill,
+    borderRadius: theme.borderRadius.md,
+  },
+  toggleRowPressed: {
+    backgroundColor: 'rgba(26, 123, 196, 0.08)',
   },
 
   // ─── Coming Soon Badge ───────────────────────────────────────────────────
@@ -678,8 +706,11 @@ const styles = StyleSheet.create({
   // ─── Modals ──────────────────────────────────────────────────────────────
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
     justifyContent: 'flex-end',
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
   },
   modalContent: {
     backgroundColor: theme.colors.white,

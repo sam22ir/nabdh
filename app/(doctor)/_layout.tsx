@@ -1,10 +1,11 @@
 import { useEffect } from "react";
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { I18nManager, View, ActivityIndicator } from "react-native";
+import { I18nManager, View, ActivityIndicator, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import { theme } from "@/lib/theme";
 
 const TAB_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   dashboard: "grid",
@@ -47,7 +48,7 @@ export default function DoctorTabLayout() {
   if (me === undefined) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <ActivityIndicator size="large" color="#1A7BC4" />
+        <ActivityIndicator size="large" color={theme.colors.official} />
       </View>
     );
   }
@@ -70,9 +71,11 @@ export default function DoctorTabLayout() {
           );
         },
         tabBarLabel: ARABIC_LABELS[route.name] ?? route.name,
-        tabBarActiveTintColor: "#1A7BC4",
-        tabBarInactiveTintColor: "#9CA3AF",
-        tabBarStyle: { direction: "rtl" as any },
+        tabBarActiveTintColor: theme.colors.official,
+        tabBarInactiveTintColor: theme.colors.textMuted,
+        tabBarLabelStyle: styles.tabBarLabel,
+        tabBarStyle: styles.tabBar,
+        tabBarItemStyle: styles.tabBarItem,
         headerShown: false,
       })}
     >
@@ -84,3 +87,23 @@ export default function DoctorTabLayout() {
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  tabBar: {
+    direction: "rtl" as any,
+    minHeight: 66,
+    paddingTop: 6,
+    paddingBottom: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: theme.colors.border,
+    backgroundColor: theme.colors.surfaceRaised,
+  },
+  tabBarItem: {
+    paddingVertical: 2,
+  },
+  tabBarLabel: {
+    fontFamily: theme.typography.fontFamily.arabicBold,
+    fontSize: 11,
+    marginTop: 2,
+  },
+});

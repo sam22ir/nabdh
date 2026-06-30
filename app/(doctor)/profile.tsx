@@ -22,6 +22,12 @@ import { z } from 'zod';
 import { useMutation, useQuery } from 'convex/react';
 
 import { api } from '@/convex/_generated/api';
+import {
+  DoctorHeader,
+  DoctorSection,
+  MetricStrip,
+  type MetricItem,
+} from '@/components/doctor-ui';
 import { theme } from '@/lib/theme';
 import { rtlTextAlign } from '@/lib/rtl';
 import { getArabicErrorMessage } from '@/lib/errorMessages';
@@ -32,6 +38,7 @@ import type { Id } from '@/convex/_generated/dataModel';
 // =============================================================================
 
 const TOAST_DURATION = 2500;
+const COMPLETE_PROFILE_TIMEOUT_MS = 10000;
 
 const LANGUAGES_OPTIONS: Array<{ label: string; value: string }> = [
   { label: 'العربية', value: 'ar' },
@@ -115,6 +122,36 @@ const profileSchema = z.object({
 
 type ProfileFormData = z.infer<typeof profileSchema>;
 
+const completeDoctorProfileSchema = z.object({
+  specialtyId: z.string().min(1, { message: 'الرجاء اختيار التخصص' }),
+  orderRegistrationNumber: z.string().min(3, { message: 'رقم التسجيل مطلوب' }),
+});
+
+type CompleteDoctorProfileFormData = z.infer<typeof completeDoctorProfileSchema>;
+
+function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  timeoutMessage: string,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      reject(new Error(timeoutMessage));
+    }, timeoutMs);
+
+    promise.then(
+      (value) => {
+        clearTimeout(timeoutId);
+        resolve(value);
+      },
+      (error: unknown) => {
+        clearTimeout(timeoutId);
+        reject(error);
+      },
+    );
+  });
+}
+
 const EMPTY_INITIAL_DATA: ProfileFormData = {
   fullNameAr: '',
   fullNameFr: '',
@@ -171,27 +208,6 @@ const Toast: React.FC<ToastProps> = ({ visible, message, icon }) => {
     </Animated.View>
   );
 };
-
-// ── Section Header ──────────────────────────────────────────────────────────
-
-interface SectionHeaderProps {
-  title: string;
-  icon?: keyof typeof Ionicons.glyphMap;
-}
-
-const SectionHeader: React.FC<SectionHeaderProps> = ({ title, icon }) => (
-  <View style={styles.sectionHeader}>
-    {icon ? (
-      <Ionicons
-        name={icon}
-        size={18}
-        color={theme.colors.primary}
-        style={styles.sectionHeaderIcon}
-      />
-    ) : null}
-    <Text style={styles.sectionTitle}>{title}</Text>
-  </View>
-);
 
 // ── Form Field ──────────────────────────────────────────────────────────────
 
@@ -465,31 +481,6 @@ const ClinicsManager: React.FC<ClinicsManagerProps> = ({
   </View>
 );
 
-// ── Read-only Display Row ───────────────────────────────────────────────────
-
-interface DisplayRowProps {
-  label: string;
-  value: string;
-  icon?: keyof typeof Ionicons.glyphMap;
-}
-
-const DisplayRow: React.FC<DisplayRowProps> = ({ label, value, icon }) => (
-  <View style={styles.displayRow}>
-    {icon ? (
-      <Ionicons
-        name={icon}
-        size={16}
-        color={theme.colors.textSecondary}
-        style={styles.displayRowIcon}
-      />
-    ) : null}
-    <View style={styles.displayRowContent}>
-      <Text style={styles.displayRowLabel}>{label}</Text>
-      <Text style={styles.displayRowValue}>{value}</Text>
-    </View>
-  </View>
-);
-
 // =============================================================================
 // Main Screen
 // =============================================================================
@@ -501,7 +492,9 @@ export default function DoctorProfileScreen() {
     | null
     | undefined;
   const wilayas = useQuery(api.locations.listWilayas, {}) ?? [];
+  const specialties = useQuery(api.specialties.list, {}) ?? [];
   const updateProfile = useMutation(api.doctors.updateProfile);
+  const completeDoctorProfile = useMutation(api.users.completeDoctorProfile);
   const createClinic = useMutation(api.clinics.create);
   const updateClinic = useMutation(api.clinics.update);
   const deactivateClinic = useMutation(api.clinics.delete_);
@@ -519,13 +512,36 @@ export default function DoctorProfileScreen() {
     defaultValues: EMPTY_INITIAL_DATA,
   });
 
+  const {
+    control: completeControl,
+    handleSubmit: handleCompleteSubmit,
+    formState: {
+      errors: completeErrors,
+      isSubmitting: isCompletingDoctorProfile,
+    },
+    setValue: setCompleteValue,
+    watch: watchComplete,
+  } = useForm<CompleteDoctorProfileFormData>({
+    resolver: zodResolver(completeDoctorProfileSchema) as any,
+    defaultValues: {
+      specialtyId: '',
+      orderRegistrationNumber: '',
+    },
+  });
+
   const watchedLanguages = watch('languages');
   const watchedSpecialtyId = watch('specialtyId');
+  const watchedCompleteSpecialtyId = watchComplete('specialtyId');
 
   // ── Local state ───────────────────────────────────────────────────────────
   const [toastVisible, setToastVisible] = useState(false);
   const [specialtyPickerVisible, setSpecialtyPickerVisible] = useState(false);
+  const [completeSpecialtyPickerVisible, setCompleteSpecialtyPickerVisible] =
+    useState(false);
   const [clinicModalVisible, setClinicModalVisible] = useState(false);
+  const [completeDoctorProfileError, setCompleteDoctorProfileError] = useState<
+    string | null
+  >(null);
   const [clinicName, setClinicName] = useState('');
   const [clinicAddress, setClinicAddress] = useState('');
   const [clinicPhone, setClinicPhone] = useState('');
@@ -543,25 +559,80 @@ export default function DoctorProfileScreen() {
 
   // ── Derived ───────────────────────────────────────────────────────────────
   const specialtyOptions = useMemo<SpecialtyOption[]>(() => {
-    if (!profile) return [];
     const options = new Map<Id<'specialties'>, SpecialtyOption>();
-    options.set(profile.specialtyId, {
-      id: profile.specialtyId,
-      nameAr: profile.specialty.nameAr,
-      nameFr: profile.specialty.nameFr,
-    });
+    for (const specialty of specialties) {
+      options.set(specialty._id, {
+        id: specialty._id,
+        nameAr: specialty.nameAr,
+        nameFr: specialty.nameFr,
+      });
+    }
+    if (profile) {
+      options.set(profile.specialtyId, {
+        id: profile.specialtyId,
+        nameAr: profile.specialty.nameAr,
+        nameFr: profile.specialty.nameFr,
+      });
+    }
     return [...options.values()];
-  }, [profile]);
+  }, [profile, specialties]);
 
   const selectedSpecialty = useMemo(
     () => specialtyOptions.find((s) => s.id === watchedSpecialtyId),
     [specialtyOptions, watchedSpecialtyId],
+  );
+  const selectedCompleteSpecialty = useMemo(
+    () => specialtyOptions.find((s) => s.id === watchedCompleteSpecialtyId),
+    [specialtyOptions, watchedCompleteSpecialtyId],
   );
 
   const activeClinics = useMemo(
     () => (profile?.clinics ?? []).filter((clinic) => clinic.isActive),
     [profile?.clinics],
   );
+
+  const completionStats = useMemo(() => {
+    if (!profile) {
+      return { complete: 0, total: 8, percent: 0 };
+    }
+    const checks = [
+      Boolean(profile.user.fullNameAr),
+      Boolean(profile.user.fullNameFr),
+      Boolean(profile.user.phone),
+      Boolean(profile.specialtyId),
+      Boolean(profile.orderRegistrationNumber),
+      profile.languages.length > 0,
+      profile.consultationFee >= 0,
+      activeClinics.length > 0,
+    ];
+    const complete = checks.filter(Boolean).length;
+    return {
+      complete,
+      total: checks.length,
+      percent: Math.round((complete / checks.length) * 100),
+    };
+  }, [activeClinics.length, profile]);
+
+  const profileMetrics = useMemo((): MetricItem[] => [
+    {
+      label: 'جاهزية',
+      value: `${completionStats.percent}%`,
+      icon: 'shield-checkmark-outline',
+      tone: completionStats.percent >= 85 ? 'success' : 'warning',
+    },
+    {
+      label: 'عيادات',
+      value: activeClinics.length,
+      icon: 'business-outline',
+      tone: activeClinics.length > 0 ? 'info' : 'neutral',
+    },
+    {
+      label: 'لغات',
+      value: profile?.languages.length ?? 0,
+      icon: 'language-outline',
+      tone: 'neutral',
+    },
+  ], [activeClinics.length, completionStats.percent, profile?.languages.length]);
 
   useEffect(() => {
     if (!profile) return;
@@ -607,6 +678,28 @@ export default function DoctorProfileScreen() {
       showToast();
     },
     [showToast, updateProfile],
+  );
+
+  const onCompleteDoctorProfile = useCallback(
+    async (data: CompleteDoctorProfileFormData) => {
+      setCompleteDoctorProfileError(null);
+      try {
+        await withTimeout(
+          completeDoctorProfile({
+            specialtyId: data.specialtyId as Id<'specialties'>,
+            orderRegistrationNumber: data.orderRegistrationNumber.trim(),
+          }),
+          COMPLETE_PROFILE_TIMEOUT_MS,
+          'profile_completion_timeout',
+        );
+        showToast();
+      } catch (error) {
+        setCompleteDoctorProfileError(
+          getArabicErrorMessage(error, 'تعذر إكمال ملف الطبيب'),
+        );
+      }
+    },
+    [completeDoctorProfile, showToast],
   );
 
   const handleOpenClinicModal = useCallback(() => {
@@ -742,7 +835,7 @@ export default function DoctorProfileScreen() {
     );
   }
 
-  if (!profile || me?.role !== 'doctor') {
+  if (me?.role !== 'doctor') {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.loadingContainer}>
@@ -757,17 +850,151 @@ export default function DoctorProfileScreen() {
     );
   }
 
+  if (!profile) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <KeyboardAvoidingView
+          style={styles.flex}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <ScrollView
+            contentContainerStyle={styles.missingProfileContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.missingProfileIcon}>
+              <Ionicons
+                name="medkit-outline"
+                size={32}
+                color={theme.colors.primary}
+              />
+            </View>
+            <DoctorHeader
+              eyebrow="جاهزية الملف العام"
+              title="أكمل ملف الطبيب"
+              subtitle="نحتاج التخصص ورقم التسجيل في النقابة قبل فتح إعدادات العيادات والمواعيد."
+              icon="medkit-outline"
+              style={styles.missingDoctorHeader}
+            />
+            <Text style={styles.missingProfileText}>
+              نحتاج التخصص ورقم التسجيل في النقابة قبل فتح إعدادات العيادات
+              والمواعيد.
+            </Text>
+
+            {completeDoctorProfileError ? (
+              <View style={styles.serverErrorBox}>
+                <Text style={styles.serverErrorText}>
+                  {completeDoctorProfileError}
+                </Text>
+              </View>
+            ) : null}
+
+            <View style={styles.sectionCard}>
+              <View style={styles.fieldContainer}>
+                <Text style={styles.fieldLabel}>التخصص</Text>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.dropdownField,
+                    completeErrors.specialtyId
+                      ? styles.fieldInputError
+                      : undefined,
+                    pressed && styles.dropdownFieldPressed,
+                  ]}
+                  onPress={() => setCompleteSpecialtyPickerVisible(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel="اختر التخصص"
+                >
+                  <Text
+                    style={[
+                      styles.dropdownFieldText,
+                      !selectedCompleteSpecialty &&
+                        styles.dropdownFieldPlaceholder,
+                    ]}
+                  >
+                    {selectedCompleteSpecialty
+                      ? selectedCompleteSpecialty.nameAr
+                      : 'اختر التخصص...'}
+                  </Text>
+                  <Ionicons
+                    name="chevron-down"
+                    size={18}
+                    color={theme.colors.textSecondary}
+                  />
+                </Pressable>
+                {completeErrors.specialtyId ? (
+                  <Text style={styles.fieldError}>
+                    {completeErrors.specialtyId.message}
+                  </Text>
+                ) : null}
+              </View>
+
+              <Controller
+                control={completeControl}
+                name="orderRegistrationNumber"
+                render={({ field: { onChange, onBlur, value } }) => (
+                  <FormField
+                    label="رقم التسجيل في النقابة"
+                    value={value}
+                    onChangeText={onChange}
+                    onBlur={onBlur}
+                    error={completeErrors.orderRegistrationNumber?.message}
+                    placeholder="مثال: 2024-12345"
+                  />
+                )}
+              />
+            </View>
+
+            <Pressable
+              style={({ pressed }) => [
+                styles.saveButton,
+                isCompletingDoctorProfile && styles.saveButtonDisabled,
+                pressed && !isCompletingDoctorProfile && styles.saveButtonPressed,
+              ]}
+              onPress={handleCompleteSubmit(onCompleteDoctorProfile)}
+              disabled={isCompletingDoctorProfile}
+              accessibilityRole="button"
+              accessibilityLabel="إكمال ملف الطبيب"
+            >
+              <Ionicons
+                name={
+                  isCompletingDoctorProfile ? 'hourglass-outline' : 'save-outline'
+                }
+                size={20}
+                color={theme.colors.white}
+                style={styles.saveButtonIcon}
+              />
+              <Text style={styles.saveButtonText}>
+                {isCompletingDoctorProfile ? 'جاري الحفظ...' : 'إكمال الملف'}
+              </Text>
+            </Pressable>
+          </ScrollView>
+
+          <SpecialtyPicker
+            visible={completeSpecialtyPickerVisible}
+            selectedId={watchedCompleteSpecialtyId}
+            options={specialtyOptions}
+            onSelect={(id) => {
+              setCompleteValue('specialtyId', id, {
+                shouldDirty: true,
+                shouldValidate: true,
+              });
+              setCompleteSpecialtyPickerVisible(false);
+            }}
+            onClose={() => setCompleteSpecialtyPickerVisible(false)}
+          />
+
+          <Toast visible={toastVisible} message="تم الحفظ" icon="checkmark-circle" />
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        {/* ── Header ─────────────────────────────────────────────── */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>ملفي الشخصي</Text>
-        </View>
-
         {/* ── Scrollable Form ─────────────────────────────────────── */}
         <ScrollView
           style={styles.flex}
@@ -775,11 +1002,19 @@ export default function DoctorProfileScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* ──────────────────────────────────────────────────────── */}
-          {/* Personal Information Section                           */}
-          {/* ──────────────────────────────────────────────────────── */}
-          <SectionHeader title="المعلومات الشخصية" icon="person-outline" />
+          <DoctorHeader
+            eyebrow="جاهزية الملف العام"
+            title="ملفي الشخصي"
+            subtitle={`اكتملت ${completionStats.complete} من ${completionStats.total} بيانات عامة. بيانات الثقة العامة تظهر للمرضى كما تحفظها هنا.`}
+            icon="id-card-outline"
+          />
 
+          <MetricStrip items={profileMetrics} />
+
+          <DoctorSection
+            title="بيانات الثقة العامة"
+            subtitle="الاسم، الهاتف، والتخصص هي أول إشارات يراجعها المريض"
+          >
           <View style={styles.sectionCard}>
             {/* Email - read-only */}
             <View style={styles.emailDisplayRow}>
@@ -848,12 +1083,12 @@ export default function DoctorProfileScreen() {
               )}
             />
           </View>
+          </DoctorSection>
 
-          {/* ──────────────────────────────────────────────────────── */}
-          {/* Professional Information Section                        */}
-          {/* ──────────────────────────────────────────────────────── */}
-          <SectionHeader title="المعلومات المهنية" icon="medkit-outline" />
-
+          <DoctorSection
+            title="المعلومات المهنية"
+            subtitle="اجعل الخبرة، اللغات، ورقم التسجيل واضحة وقابلة للتحقق"
+          >
           <View style={styles.sectionCard}>
             {/* Specialty - Pressable dropdown */}
             <View style={styles.fieldContainer}>
@@ -993,12 +1228,12 @@ export default function DoctorProfileScreen() {
               )}
             />
           </View>
+          </DoctorSection>
 
-          {/* ──────────────────────────────────────────────────────── */}
-          {/* Clinics Section                                         */}
-          {/* ──────────────────────────────────────────────────────── */}
-          <SectionHeader title="العيادات" icon="business-outline" />
-
+          <DoctorSection
+            title="العيادات"
+            subtitle="بيانات العيادات تحدد أين يمكن للمرضى الحجز"
+          >
           <View style={styles.sectionCard}>
             <ClinicsManager
               clinics={activeClinics}
@@ -1007,12 +1242,12 @@ export default function DoctorProfileScreen() {
               onDeactivate={handleDeactivateClinic}
             />
           </View>
+          </DoctorSection>
 
-          {/* ──────────────────────────────────────────────────────── */}
-          {/* Pricing Section                                         */}
-          {/* ──────────────────────────────────────────────────────── */}
-          <SectionHeader title="الأسعار" icon="cash-outline" />
-
+          <DoctorSection
+            title="الأسعار"
+            subtitle="تظهر الرسوم بوضوح قبل اختيار الموعد"
+          >
           <View style={styles.sectionCard}>
             <Controller
               control={control}
@@ -1046,6 +1281,7 @@ export default function DoctorProfileScreen() {
               )}
             />
           </View>
+          </DoctorSection>
 
           {/* ── Save Button ────────────────────────────────────────── */}
           <Pressable
@@ -1324,6 +1560,40 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: theme.spacing['4xl'],
   },
+  missingProfileContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing['4xl'],
+  },
+  missingProfileIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: theme.colors.secondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    marginBottom: theme.spacing.lg,
+  },
+  missingProfileTitle: {
+    fontFamily: theme.typography.fontFamily.arabicBold,
+    fontSize: 22,
+    color: theme.colors.textPrimary,
+    textAlign: 'center',
+    marginBottom: theme.spacing.sm,
+  },
+  missingProfileText: {
+    fontFamily: theme.typography.fontFamily.arabic,
+    fontSize: 14,
+    lineHeight: 22,
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: theme.spacing.lg,
+  },
+  missingDoctorHeader: {
+    marginHorizontal: 0,
+  },
   bottomSpacer: {
     height: theme.spacing['4xl'],
   },
@@ -1367,6 +1637,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.md,
     ...theme.shadows.sm,
+  },
+  serverErrorBox: {
+    backgroundColor: '#FDEDEC',
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.danger,
+    marginHorizontal: theme.spacing.lg,
+    marginBottom: theme.spacing.md,
+    padding: theme.spacing.md,
+  },
+  serverErrorText: {
+    fontFamily: theme.typography.fontFamily.arabic,
+    fontSize: 13,
+    color: theme.colors.danger,
+    textAlign: 'center',
   },
 
   // ─── Fields ──────────────────────────────────────────────────────────────

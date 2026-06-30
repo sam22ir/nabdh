@@ -22,6 +22,14 @@ import { useMutation, useQuery } from 'convex/react';
 
 import { api } from '@/convex/_generated/api';
 import EmptyState from '@/components/EmptyState';
+import {
+  AppointmentWorkItem,
+  DoctorHeader,
+  DoctorSection,
+  SegmentedControl,
+  type MetricItem,
+  type SegmentOption,
+} from '@/components/doctor-ui';
 import { theme } from '@/lib/theme';
 import { rtlTextAlign } from '@/lib/rtl';
 import type { Appointment, AppointmentStatus, VisitType } from '@/lib/types';
@@ -89,14 +97,11 @@ const STATUS_CONFIG: Record<
 };
 
 type ViewTab = 'today' | 'week' | 'month';
-
-interface TabDefinition {
-  key: ViewTab;
-  label: string;
+type AppointmentTabOption = SegmentOption<ViewTab> & {
   icon: keyof typeof Ionicons.glyphMap;
-}
+};
 
-const TABS: readonly TabDefinition[] = [
+const TABS: AppointmentTabOption[] = [
   { key: 'today', label: 'اليوم', icon: 'today' },
   { key: 'week', label: 'الأسبوع', icon: 'calendar' },
   { key: 'month', label: 'الشهر', icon: 'calendar-outline' },
@@ -207,6 +212,13 @@ function sortAppointments(list: DashboardAppointment[]): DashboardAppointment[] 
   });
 }
 
+function getStatusTone(status: AppointmentStatus): MetricItem['tone'] {
+  if (status === 'completed') return 'success';
+  if (status === 'cancelled') return 'danger';
+  if (status === 'no_show') return 'warning';
+  return 'info';
+}
+
 /** Build week sections grouped by day. */
 function getWeekSections(
   weekDays: { date: string; appointments: ConvexDoctorBooking[] }[],
@@ -297,50 +309,6 @@ function getMonthGrid(
 // Sub-components
 // =============================================================================
 
-// ── Segment Tabs ─────────────────────────────────────────────────────────────
-
-interface SegmentTabsProps {
-  activeTab: ViewTab;
-  onTabChange: (tab: ViewTab) => void;
-}
-
-const SegmentTabs: React.FC<SegmentTabsProps> = ({ activeTab, onTabChange }) => (
-  <View style={styles.segmentContainer}>
-    <View style={styles.segmentRow}>
-      {TABS.map((tab) => {
-        const isActive = activeTab === tab.key;
-        return (
-          <Pressable
-            key={tab.key}
-            style={({ pressed }) => [
-              styles.segmentTab,
-              isActive && styles.segmentTabActive,
-              pressed && styles.segmentTabPressed,
-            ]}
-            onPress={() => onTabChange(tab.key)}
-            accessibilityRole="button"
-            accessibilityLabel={tab.label}
-          >
-            <Ionicons
-              name={tab.icon}
-              size={16}
-              color={isActive ? theme.colors.primary : theme.colors.textSecondary}
-            />
-            <Text
-              style={[
-                styles.segmentTabText,
-                isActive && styles.segmentTabTextActive,
-              ]}
-            >
-              {tab.label}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </View>
-  </View>
-);
-
 // ── Appointment Card with Actions ───────────────────────────────────────────
 
 interface AppointmentCardActionsProps {
@@ -384,61 +352,14 @@ const AppointmentCardActions: React.FC<AppointmentCardActionsProps> = ({
 
   return (
     <View style={styles.cardWrapper}>
-      {/* Card body */}
-      <View style={[styles.cardBody, (isCompleted || isCancelled || isNoShow) && styles.cardBodyMuted]}>
-        {/* Avatar + Info */}
-        <View style={styles.cardRow}>
-          <View style={styles.cardAvatarCol}>
-            <View
-              style={[
-                styles.cardAvatarCircle,
-                { backgroundColor: isCompleted ? theme.colors.border : theme.colors.secondary },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.cardAvatarText,
-                  { color: isCompleted ? theme.colors.textSecondary : theme.colors.primary },
-                ]}
-              >
-                {appointment.patientName.charAt(0)}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.cardInfoCol}>
-            <Text
-              style={[
-                styles.cardPatientName,
-                (isCompleted || isCancelled || isNoShow) && styles.cardTextMuted,
-              ]}
-              numberOfLines={1}
-            >
-              {appointment.patientName}
-            </Text>
-            <View style={styles.cardMetaRow}>
-              <Text style={styles.cardTime}>{appointment.appointmentTime}</Text>
-              <Text style={styles.cardDot}>·</Text>
-              <Text style={styles.cardType}>
-                {VISIT_TYPE_LABELS[appointment.visitType]}
-              </Text>
-            </View>
-            <Text style={styles.cardReason} numberOfLines={1}>
-              {appointment.reason}
-            </Text>
-          </View>
-
-          <View
-            style={[
-              styles.cardBadge,
-              { backgroundColor: statusCfg.backgroundColor },
-            ]}
-          >
-            <Text style={[styles.cardBadgeText, { color: statusCfg.color }]}>
-              {statusCfg.label}
-            </Text>
-          </View>
-        </View>
+      <View style={(isCompleted || isCancelled || isNoShow) && styles.cardBodyMuted}>
+        <AppointmentWorkItem
+          time={appointment.appointmentTime}
+          patientName={appointment.patientName}
+          meta={`${VISIT_TYPE_LABELS[appointment.visitType]} · ${appointment.reason ?? 'بدون سبب مسجل'}`}
+          statusLabel={statusCfg.label}
+          tone={getStatusTone(appointment.status)}
+        />
       </View>
 
       {/* Action buttons (only for confirmed appointments) */}
@@ -950,14 +871,20 @@ export default function DoctorAppointmentsScreen() {
   // ── Main render ──────────────────────────────────────────────────────
   return (
     <SafeAreaView style={styles.safeArea}>
-      {/* ── Header ───────────────────────────────────────────────── */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>المواعيد</Text>
-        <Text style={styles.headerSubtitle}>{formatArabicDate(todayDate)}</Text>
-      </View>
+      <DoctorHeader
+        eyebrow="قائمة المواعيد"
+        title="مواعيد العيادة"
+        subtitle={`${formatArabicDate(todayDate)} · فرز حسب الفترة وحالة الموعد.`}
+        icon="calendar-outline"
+      />
 
-      {/* ── Segment Tabs ──────────────────────────────────────────── */}
-      <SegmentTabs activeTab={activeTab} onTabChange={setActiveTab} />
+      <DoctorSection title="فرز حسب الفترة">
+        <SegmentedControl
+          options={TABS}
+          value={activeTab}
+          onChange={setActiveTab}
+        />
+      </DoctorSection>
 
       {/* ── Content ───────────────────────────────────────────────── */}
       <ScrollView
@@ -973,6 +900,10 @@ export default function DoctorAppointmentsScreen() {
           />
         }
       >
+        <DoctorSection
+          title="قائمة المواعيد"
+          subtitle="استخدمها للفرز، المتابعة، وإضافة ملاحظات الطبيب"
+        >
         {/* ─── Today Tab ──────────────────────────────────────── */}
         {activeTab === 'today' && (
           <>
@@ -1122,6 +1053,8 @@ export default function DoctorAppointmentsScreen() {
             )}
           </>
         )}
+
+        </DoctorSection>
 
         {/* Bottom spacer */}
         <View style={styles.bottomSpacer} />

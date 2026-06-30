@@ -20,6 +20,13 @@ import { useMutation, useQuery } from 'convex/react';
 
 import { api } from '@/convex/_generated/api';
 import EmptyState from '@/components/EmptyState';
+import {
+  AppointmentWorkItem,
+  DoctorHeader,
+  DoctorSection,
+  MetricStrip,
+  type MetricItem,
+} from '@/components/doctor-ui';
 import { theme } from '@/lib/theme';
 import { rtlTextAlign } from '@/lib/rtl';
 import type { Appointment, AppointmentStatus, VisitType } from '@/lib/types';
@@ -130,15 +137,6 @@ interface ConvexDoctorBooking {
   profileName?: string;
 }
 
-/** Stats card data. */
-interface StatCardData {
-  label: string;
-  count: number;
-  icon: keyof typeof Ionicons.glyphMap;
-  color: string;
-  backgroundColor: string;
-}
-
 // =============================================================================
 // Helpers
 // =============================================================================
@@ -197,177 +195,12 @@ function getTodayListAppointments(appointments: DashboardAppointment[]): Dashboa
     .sort((a, b) => a.appointmentTime.localeCompare(b.appointmentTime));
 }
 
-// =============================================================================
-// Sub-components
-// =============================================================================
-
-// ── Stat Card ────────────────────────────────────────────────────────────────
-
-interface StatCardProps {
-  data: StatCardData;
+function getStatusTone(status: AppointmentStatus): MetricItem['tone'] {
+  if (status === 'completed') return 'success';
+  if (status === 'cancelled') return 'danger';
+  if (status === 'no_show') return 'warning';
+  return 'info';
 }
-
-const StatCard: React.FC<StatCardProps> = ({ data }) => (
-  <View style={[styles.statCard, { backgroundColor: data.backgroundColor }]}>
-    <View style={[styles.statIconContainer, { backgroundColor: data.color }]}>
-      <Ionicons name={data.icon} size={18} color={theme.colors.white} />
-    </View>
-    <Text style={[styles.statCount, { color: data.color }]}>{data.count}</Text>
-    <Text style={styles.statLabel} numberOfLines={1}>
-      {data.label}
-    </Text>
-  </View>
-);
-
-// ── Section Header ──────────────────────────────────────────────────────────
-
-interface SectionHeaderProps {
-  title: string;
-}
-
-const SectionHeader: React.FC<SectionHeaderProps> = ({ title }) => (
-  <View style={styles.sectionHeader}>
-    <Text style={styles.sectionTitle}>{title}</Text>
-  </View>
-);
-
-// ── Next Patient Card ───────────────────────────────────────────────────────
-
-interface NextPatientCardProps {
-  appointment: DashboardAppointment;
-}
-
-const NextPatientCard: React.FC<NextPatientCardProps> = ({ appointment }) => (
-  <View style={styles.nextPatientCard}>
-    {/* Card header */}
-    <View style={styles.nextPatientHeader}>
-      <View style={styles.nextPatientHeaderLeft}>
-        <Ionicons name="person" size={16} color={theme.colors.primary} />
-        <Text style={styles.nextPatientHeaderTitle}>المريض القادم</Text>
-      </View>
-      <View style={styles.nextPatientBadge}>
-        <Text style={styles.nextPatientBadgeText}>
-          {VISIT_TYPE_LABELS[appointment.visitType]}
-        </Text>
-      </View>
-    </View>
-
-    {/* Patient name */}
-    <Text style={styles.nextPatientName}>{appointment.patientName}</Text>
-
-    {/* Divider */}
-    <View style={styles.divider} />
-
-    {/* Details */}
-    <View style={styles.nextPatientDetails}>
-      <View style={styles.nextPatientDetailRow}>
-        <Ionicons name="time-outline" size={16} color={theme.colors.textSecondary} />
-        <Text style={styles.nextPatientDetailText}>
-          {appointment.appointmentTime}
-        </Text>
-      </View>
-      <View style={styles.nextPatientDetailRow}>
-        <Ionicons name="medical-outline" size={16} color={theme.colors.textSecondary} />
-        <Text style={styles.nextPatientDetailText}>
-          {VISIT_TYPE_LABELS[appointment.visitType]}
-        </Text>
-      </View>
-      <View style={styles.nextPatientDetailRow}>
-        <Ionicons name="chatbubble-outline" size={16} color={theme.colors.textSecondary} />
-        <Text style={styles.nextPatientDetailText} numberOfLines={2}>
-          {appointment.reason}
-        </Text>
-      </View>
-    </View>
-  </View>
-);
-
-// ── Today Appointment Item ──────────────────────────────────────────────────
-
-interface TodayAppointmentItemProps {
-  appointment: DashboardAppointment;
-  onPress: () => void;
-}
-
-const TodayAppointmentItem: React.FC<TodayAppointmentItemProps> = ({
-  appointment,
-  onPress,
-}) => {
-  const statusCfg = STATUS_CONFIG[appointment.status];
-  const isCompleted = appointment.status === 'completed';
-
-  return (
-    <Pressable
-      style={({ pressed }) => [
-        styles.todayItem,
-        isCompleted && styles.todayItemCompleted,
-        pressed && styles.todayItemPressed,
-      ]}
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={`اضغط لعرض تفاصيل موعد ${appointment.patientName}`}
-    >
-      {/* Avatar column */}
-      <View style={styles.todayItemAvatar}>
-        <View
-          style={[
-            styles.todayItemAvatarCircle,
-            { backgroundColor: isCompleted ? theme.colors.border : theme.colors.secondary },
-          ]}
-        >
-          <Text
-            style={[
-              styles.todayItemAvatarText,
-              { color: isCompleted ? theme.colors.textSecondary : theme.colors.primary },
-            ]}
-          >
-            {appointment.patientName.charAt(0)}
-          </Text>
-        </View>
-      </View>
-
-      {/* Info column */}
-      <View style={styles.todayItemInfo}>
-        <Text
-          style={[
-            styles.todayItemName,
-            isCompleted && styles.todayItemTextMuted,
-          ]}
-          numberOfLines={1}
-        >
-          {appointment.patientName}
-        </Text>
-        <View style={styles.todayItemMeta}>
-          <Text style={styles.todayItemTime}>{appointment.appointmentTime}</Text>
-          <Text style={styles.todayItemDot}>·</Text>
-          <Text style={styles.todayItemType}>
-            {VISIT_TYPE_LABELS[appointment.visitType]}
-          </Text>
-        </View>
-      </View>
-
-      {/* Status badge */}
-      <View
-        style={[
-          styles.todayItemBadge,
-          { backgroundColor: statusCfg.backgroundColor },
-        ]}
-      >
-        <Text style={[styles.todayItemBadgeText, { color: statusCfg.color }]}>
-          {statusCfg.label}
-        </Text>
-      </View>
-
-      {/* Chevron */}
-      <Ionicons
-        name="chevron-forward"
-        size={16}
-        color={theme.colors.textSecondary}
-        style={styles.todayItemChevron}
-      />
-    </Pressable>
-  );
-};
 
 // ── Appointment Detail Modal ────────────────────────────────────────────────
 
@@ -672,34 +505,30 @@ export default function DoctorDashboardScreen() {
     [homeData?.todayAppointments],
   );
 
-  const statsCards = useMemo((): StatCardData[] => [
+  const metricItems = useMemo((): MetricItem[] => [
     {
       label: 'اليوم',
-      count: homeData?.todayStats.total ?? 0,
+      value: homeData?.todayStats.total ?? 0,
       icon: 'calendar',
-      color: theme.colors.primary,
-      backgroundColor: '#E8F4FD',
+      tone: 'info',
     },
     {
       label: 'مؤكد',
-      count: homeData?.todayStats.confirmed ?? 0,
+      value: homeData?.todayStats.confirmed ?? 0,
       icon: 'checkmark-circle',
-      color: theme.colors.success,
-      backgroundColor: '#E8F8EE',
+      tone: 'success',
     },
     {
       label: 'مكتمل',
-      count: homeData?.todayStats.completed ?? 0,
+      value: homeData?.todayStats.completed ?? 0,
       icon: 'checkmark-done',
-      color: theme.colors.textSecondary,
-      backgroundColor: '#F3F4F6',
+      tone: 'neutral',
     },
     {
       label: 'ملغى',
-      count: homeData?.todayStats.cancelled ?? 0,
+      value: homeData?.todayStats.cancelled ?? 0,
       icon: 'close-circle',
-      color: theme.colors.danger,
-      backgroundColor: '#FDEDEC',
+      tone: 'danger',
     },
   ], [homeData?.todayStats]);
 
@@ -770,8 +599,12 @@ export default function DoctorDashboardScreen() {
   // ── Render today appointment item ──────────────────────────────────────
   const renderTodayItem = useCallback(
     ({ item }: ListRenderItemInfo<DashboardAppointment>) => (
-      <TodayAppointmentItem
-        appointment={item}
+      <AppointmentWorkItem
+        time={item.appointmentTime}
+        patientName={item.patientName}
+        meta={`${VISIT_TYPE_LABELS[item.visitType]} · ${item.reason ?? 'بدون سبب مسجل'}`}
+        statusLabel={STATUS_CONFIG[item.status].label}
+        tone={getStatusTone(item.status)}
         onPress={() => openDetailModal(item)}
       />
     ),
@@ -811,65 +644,61 @@ export default function DoctorDashboardScreen() {
           />
         }
       >
-        {/* ── Greeting Section ─────────────────────────────────── */}
-        <View style={styles.greetingSection}>
-          <View style={styles.greetingTextContainer}>
-            <Text style={styles.greetingEmoji}>👋</Text>
-            <View>
-              <Text style={styles.greetingText}>
-                {greeting}، د.
-              </Text>
-              <Text style={styles.greetingName} numberOfLines={1}>
-                {doctorName}
+        <DoctorHeader
+          eyebrow="عيادة اليوم"
+          title={`${greeting}، د. ${doctorName}`}
+          subtitle={`${todayArabic} · راقب قائمة تشغيل اليوم وحدد المريض القادم بسرعة.`}
+          icon="pulse-outline"
+        />
+
+        <MetricStrip items={metricItems} />
+
+        <DoctorSection
+          title="المريض القادم"
+          subtitle="أول موعد مؤكد يحتاج انتباهك الآن"
+        >
+          {nextAppointment ? (
+            <AppointmentWorkItem
+              time={nextAppointment.appointmentTime}
+              patientName={nextAppointment.patientName}
+              meta={`${VISIT_TYPE_LABELS[nextAppointment.visitType]} · ${nextAppointment.reason ?? 'بدون سبب مسجل'}`}
+              statusLabel={STATUS_CONFIG[nextAppointment.status].label}
+              tone={getStatusTone(nextAppointment.status)}
+              icon="person-circle-outline"
+              onPress={() => openDetailModal(nextAppointment)}
+            />
+          ) : (
+            <View style={styles.emptyNextPatient}>
+              <Ionicons name="checkmark-done-circle" size={32} color={theme.colors.success} />
+              <Text style={styles.emptyNextPatientText}>
+                لا يوجد مرضى في الانتظار
               </Text>
             </View>
-          </View>
-          <View style={styles.greetingDateContainer}>
-            <Ionicons name="calendar-outline" size={14} color={theme.colors.textSecondary} />
-            <Text style={styles.greetingDate}>{todayArabic}</Text>
-          </View>
-        </View>
+          )}
+        </DoctorSection>
 
-        {/* ── Stats Cards Row ───────────────────────────────────── */}
-        <View style={styles.statsRow}>
-          {statsCards.map((card) => (
-            <StatCard key={card.label} data={card} />
-          ))}
-        </View>
-
-        {/* ── Next Patient Section ──────────────────────────────── */}
-        <SectionHeader title="المريض القادم" />
-        {nextAppointment ? (
-          <NextPatientCard appointment={nextAppointment} />
-        ) : (
-          <View style={styles.emptyNextPatient}>
-            <Ionicons name="checkmark-done-circle" size={40} color={theme.colors.success} />
-            <Text style={styles.emptyNextPatientText}>
-              لا يوجد مرضى في الانتظار
-            </Text>
-          </View>
-        )}
-
-        {/* ── Today's Appointments Section ──────────────────────── */}
-        <SectionHeader title="قائمة مرضى اليوم" />
-
-        {todayAppointments.length > 0 ? (
-          <View style={styles.todayListContainer}>
-            <FlatList
-              data={todayAppointments}
-              renderItem={renderTodayItem}
-              keyExtractor={keyExtractor}
-              scrollEnabled={false}
-              ItemSeparatorComponent={Separator}
+        <DoctorSection
+          title="قائمة تشغيل اليوم"
+          subtitle="المواعيد المؤكدة والمكتملة مرتبة حسب الوقت"
+        >
+          {todayAppointments.length > 0 ? (
+            <View style={styles.todayListContainer}>
+              <FlatList
+                data={todayAppointments}
+                renderItem={renderTodayItem}
+                keyExtractor={keyExtractor}
+                scrollEnabled={false}
+                ItemSeparatorComponent={Separator}
+              />
+            </View>
+          ) : (
+            <EmptyState
+              icon="📅"
+              title="لا يوجد مواعيد اليوم"
+              subtitle="ليس لديك أي مواعيد مؤكدة أو مكتملة لهذا اليوم"
             />
-          </View>
-        ) : (
-          <EmptyState
-            icon="📅"
-            title="لا يوجد مواعيد اليوم"
-            subtitle="ليس لديك أي مواعيد مؤكدة أو مكتملة لهذا اليوم"
-          />
-        )}
+          )}
+        </DoctorSection>
 
         {/* Bottom spacer */}
         <View style={styles.bottomSpacer} />

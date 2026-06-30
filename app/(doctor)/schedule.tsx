@@ -17,8 +17,15 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery } from 'convex/react';
+import { useRouter } from 'expo-router';
 
 import { api } from '@/convex/_generated/api';
+import {
+  DoctorHeader,
+  DoctorSection,
+  MetricStrip,
+  type MetricItem,
+} from '@/components/doctor-ui';
 import { theme } from '@/lib/theme';
 import { rtlTextAlign } from '@/lib/rtl';
 import type { DayOfWeek } from '@/lib/types';
@@ -279,6 +286,16 @@ function toExceptionView(exception: {
   };
 }
 
+function countActiveScheduleDays(scheduleMap: ScheduleMap): number {
+  return Object.values(scheduleMap).reduce(
+    (total, clinicSchedule) =>
+      total +
+      Object.values(clinicSchedule).filter((schedule) => schedule.enabled)
+        .length,
+    0,
+  );
+}
+
 // =============================================================================
 // Sub-components
 // =============================================================================
@@ -310,27 +327,6 @@ const Toast: React.FC<ToastProps> = ({ visible, message, icon }) => {
     </View>
   );
 };
-
-// ── Section Header ──────────────────────────────────────────────────────────
-
-interface SectionHeaderProps {
-  title: string;
-  icon?: keyof typeof Ionicons.glyphMap;
-}
-
-const SectionHeader: React.FC<SectionHeaderProps> = ({ title, icon }) => (
-  <View style={styles.sectionHeader}>
-    {icon ? (
-      <Ionicons
-        name={icon}
-        size={18}
-        color={theme.colors.primary}
-        style={styles.sectionHeaderIcon}
-      />
-    ) : null}
-    <Text style={styles.sectionTitle}>{title}</Text>
-  </View>
-);
 
 // ── Bottom Sheet Modal Wrapper ──────────────────────────────────────────────
 
@@ -1091,6 +1087,7 @@ const ClinicPickerModal: React.FC<ClinicPickerModalProps> = ({
 // =============================================================================
 
 export default function DoctorScheduleScreen() {
+  const router = useRouter();
   const clinicDocs = useQuery(api.clinics.getMyClinics, {});
   const scheduleDocs = useQuery(api.schedules.getMySchedules, {});
   const exceptionDocs = useQuery(api.schedules.getMyExceptions, {});
@@ -1152,6 +1149,27 @@ export default function DoctorScheduleScreen() {
       ),
     [clinics],
   );
+
+  const metricItems = useMemo((): MetricItem[] => [
+    {
+      label: 'عيادات نشطة',
+      value: clinics.length,
+      icon: 'business-outline',
+      tone: 'info',
+    },
+    {
+      label: 'أيام مفتوحة',
+      value: countActiveScheduleDays(scheduleMap),
+      icon: 'calendar-outline',
+      tone: 'success',
+    },
+    {
+      label: 'استثناءات',
+      value: exceptions.length,
+      icon: 'alert-circle-outline',
+      tone: exceptions.length > 0 ? 'warning' : 'neutral',
+    },
+  ], [clinics.length, exceptions.length, scheduleMap]);
 
   // ── Toast helper ────────────────────────────────────────────────────────────
   const showToast = useCallback((message: string) => {
@@ -1378,6 +1396,10 @@ export default function DoctorScheduleScreen() {
     setExceptionModalVisible(true);
   }, [clinics]);
 
+  const handleAddClinicPress = useCallback(() => {
+    router.push('/(doctor)/profile');
+  }, [router]);
+
   if (clinicDocs === undefined || scheduleDocs === undefined || exceptionDocs === undefined) {
     return (
       <SafeAreaView style={styles.safeArea}>
@@ -1399,82 +1421,115 @@ export default function DoctorScheduleScreen() {
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        {/* ── Header ────────────────────────────────────────────── */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>جدول المواعيد</Text>
-        </View>
-
         <ScrollView
           style={styles.flex}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* ─────────────────────────────────────────────────────── */}
-          {/* Clinics Schedule Section                               */}
-          {/* ─────────────────────────────────────────────────────── */}
-          <SectionHeader title="العيادات" icon="business-outline" />
+          <DoctorHeader
+            eyebrow="ساعات العيادة"
+            title="إدارة السعة الأسبوعية"
+            subtitle="اضبط الأيام المفتوحة، ساعات العمل، مدة الموعد، والحد الأقصى للمرضى لكل عيادة."
+            icon="time-outline"
+          />
 
-          {clinics.length > 0 ? (
-            <FlatList
-              data={clinics}
-              renderItem={renderClinic}
-              keyExtractor={clinicKeyExtractor}
-              scrollEnabled={false}
-            />
-          ) : (
-            <View style={styles.emptyExceptions}>
-              <Ionicons name="business-outline" size={40} color={theme.colors.textSecondary} />
-              <Text style={styles.emptyExceptionsText}>
-                لا توجد عيادات نشطة
-              </Text>
-              <Text style={styles.emptyExceptionsSubtext}>
-                أضف عيادة نشطة قبل إعداد جدول المواعيد
-              </Text>
-            </View>
-          )}
+          <MetricStrip items={metricItems} />
 
-          {/* ─────────────────────────────────────────────────────── */}
-          {/* Exceptions Section (الإجازات والاستثناءات)              */}
-          {/* ─────────────────────────────────────────────────────── */}
-          <View style={styles.exceptionsSectionHeader}>
-            <SectionHeader title="الإجازات والاستثناءات" icon="calendar-outline" />
-            <Pressable
-              style={({ pressed }) => [
-                styles.addExceptionButton,
-                pressed && styles.addExceptionButtonPressed,
-              ]}
-              onPress={handleOpenExceptionModal}
-              accessibilityRole="button"
-              accessibilityLabel="إضافة استثناء"
-              disabled={clinics.length === 0}
-            >
-              <Ionicons name="add" size={18} color={theme.colors.white} />
-              <Text style={styles.addExceptionButtonText}>إضافة</Text>
-            </Pressable>
-          </View>
-
-          {exceptions.length > 0 ? (
-            <View style={styles.exceptionsListContainer}>
+          <DoctorSection
+            title="العيادات"
+            subtitle="فعّل أو أغلق أيام العمل لكل عيادة"
+          >
+            {clinics.length > 0 ? (
               <FlatList
-                data={exceptions}
-                renderItem={renderException}
-                keyExtractor={exceptionKeyExtractor}
+                data={clinics}
+                renderItem={renderClinic}
+                keyExtractor={clinicKeyExtractor}
                 scrollEnabled={false}
-                ItemSeparatorComponent={() => <View style={styles.exceptionSeparator} />}
               />
-            </View>
-          ) : (
-            <View style={styles.emptyExceptions}>
-              <Ionicons name="calendar-outline" size={40} color={theme.colors.textSecondary} />
-              <Text style={styles.emptyExceptionsText}>
-                لا توجد إجازات أو استثناءات
-              </Text>
-              <Text style={styles.emptyExceptionsSubtext}>
-                أضف استثناءً لتعديل جدول يوم معين
-              </Text>
-            </View>
-          )}
+            ) : (
+              <View style={styles.emptyExceptions}>
+                <Ionicons name="business-outline" size={40} color={theme.colors.textSecondary} />
+                <Text style={styles.emptyExceptionsText}>
+                  لا توجد عيادات نشطة
+                </Text>
+                <Text style={styles.emptyExceptionsSubtext}>
+                  أضف عيادة نشطة قبل إعداد جدول المواعيد
+                </Text>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.emptyClinicAction,
+                    pressed && styles.emptyClinicActionPressed,
+                  ]}
+                  onPress={handleAddClinicPress}
+                  accessibilityRole="button"
+                  accessibilityLabel="إضافة عيادة"
+                >
+                  <Ionicons name="add-circle-outline" size={18} color={theme.colors.white} />
+                  <Text style={styles.emptyClinicActionText}>إضافة عيادة</Text>
+                </Pressable>
+              </View>
+            )}
+          </DoctorSection>
+
+          <DoctorSection
+            title="الإجازات والاستثناءات"
+            subtitle="أغلق يوماً محدداً أو عرّف ساعات خاصة خارج الجدول الأسبوعي"
+            action={
+              <Pressable
+                style={({ pressed }) => [
+                  styles.addExceptionButton,
+                  clinics.length === 0 && styles.addExceptionButtonDisabled,
+                  pressed && clinics.length > 0 && styles.addExceptionButtonPressed,
+                ]}
+                onPress={handleOpenExceptionModal}
+                accessibilityRole="button"
+                accessibilityLabel="إضافة استثناء"
+                accessibilityState={{ disabled: clinics.length === 0 }}
+                disabled={clinics.length === 0}
+              >
+                <Ionicons
+                  name={clinics.length === 0 ? 'business-outline' : 'add'}
+                  size={18}
+                  color={
+                    clinics.length === 0
+                      ? theme.colors.textSecondary
+                      : theme.colors.white
+                  }
+                />
+                <Text
+                  style={[
+                    styles.addExceptionButtonText,
+                    clinics.length === 0 && styles.addExceptionButtonTextDisabled,
+                  ]}
+                >
+                  {clinics.length === 0 ? 'أضف عيادة أولاً' : 'إضافة'}
+                </Text>
+              </Pressable>
+            }
+          >
+            {exceptions.length > 0 ? (
+              <View style={styles.exceptionsListContainer}>
+                <FlatList
+                  data={exceptions}
+                  renderItem={renderException}
+                  keyExtractor={exceptionKeyExtractor}
+                  scrollEnabled={false}
+                  ItemSeparatorComponent={() => <View style={styles.exceptionSeparator} />}
+                />
+              </View>
+            ) : (
+              <View style={styles.emptyExceptions}>
+                <Ionicons name="calendar-outline" size={40} color={theme.colors.textSecondary} />
+                <Text style={styles.emptyExceptionsText}>
+                  لا توجد إجازات أو استثناءات
+                </Text>
+                <Text style={styles.emptyExceptionsSubtext}>
+                  أضف استثناءً لتعديل جدول يوم معين
+                </Text>
+              </View>
+            )}
+          </DoctorSection>
 
           {/* Bottom spacer */}
           <View style={styles.bottomSpacer} />
@@ -1773,10 +1828,18 @@ const styles = StyleSheet.create({
   addExceptionButtonPressed: {
     opacity: 0.85,
   },
+  addExceptionButtonDisabled: {
+    backgroundColor: theme.colors.background,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
   addExceptionButtonText: {
     fontFamily: theme.typography.fontFamily.arabicBold,
     fontSize: 13,
     color: theme.colors.white,
+  },
+  addExceptionButtonTextDisabled: {
+    color: theme.colors.textSecondary,
   },
   exceptionsListContainer: {
     backgroundColor: theme.colors.white,
@@ -1869,6 +1932,25 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     marginTop: theme.spacing.sm,
     textAlign: 'center',
+  },
+  emptyClinicAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.primary,
+    borderRadius: theme.borderRadius.md,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.sm,
+    marginTop: theme.spacing.lg,
+    gap: theme.spacing.xs,
+  },
+  emptyClinicActionPressed: {
+    opacity: 0.85,
+  },
+  emptyClinicActionText: {
+    fontFamily: theme.typography.fontFamily.arabicBold,
+    fontSize: 13,
+    color: theme.colors.white,
   },
 
   // ─── Toast ───────────────────────────────────────────────────────────────
