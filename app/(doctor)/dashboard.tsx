@@ -27,6 +27,7 @@ import {
   MetricStrip,
   type MetricItem,
 } from '@/components/doctor-ui';
+import { stripArabicDoctorTitle } from '@/lib/doctorNames';
 import { theme } from '@/lib/theme';
 import { rtlTextAlign } from '@/lib/rtl';
 import type { Appointment, AppointmentStatus, VisitType } from '@/lib/types';
@@ -497,6 +498,7 @@ export default function DoctorDashboardScreen() {
   const todayArabic = useMemo(() => formatTodayArabic(), []);
   const doctorName =
     me?.role === 'doctor' ? (me.fullNameAr ?? me.name ?? 'الطبيب') : 'الطبيب';
+  const doctorTitleName = stripArabicDoctorTitle(doctorName);
   const appointments = useMemo(
     () =>
       ((homeData?.todayAppointments ?? []) as ConvexDoctorBooking[]).map(
@@ -646,7 +648,7 @@ export default function DoctorDashboardScreen() {
       >
         <DoctorHeader
           eyebrow="عيادة اليوم"
-          title={`${greeting}، د. ${doctorName}`}
+          title={`${greeting}، د. ${doctorTitleName}`}
           subtitle={`${todayArabic} · راقب قائمة تشغيل اليوم وحدد المريض القادم بسرعة.`}
           icon="pulse-outline"
         />

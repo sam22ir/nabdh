@@ -13,6 +13,10 @@ describe("doctor screens use backend data", () => {
     expect(source).toContain("theme.colors.official");
     expect(source).toContain("theme.colors.textMuted");
     expect(source).toContain("tabBarLabelStyle");
+    expect(source).not.toContain("direction:");
+    expect(source).not.toContain("writingDirection:");
+    expect(source).toContain("height: 76");
+    expect(source).toContain("lineHeight: 14");
   });
 
   test("doctor tabs use the operational redesign primitives", () => {

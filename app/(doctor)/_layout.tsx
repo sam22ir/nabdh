@@ -90,10 +90,10 @@ export default function DoctorTabLayout() {
 
 const styles = StyleSheet.create({
   tabBar: {
-    direction: "rtl" as any,
-    minHeight: 66,
+    height: 76,
+    minHeight: 76,
     paddingTop: 6,
-    paddingBottom: 8,
+    paddingBottom: 12,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: theme.colors.border,
     backgroundColor: theme.colors.surfaceRaised,
@@ -104,6 +104,7 @@ const styles = StyleSheet.create({
   tabBarLabel: {
     fontFamily: theme.typography.fontFamily.arabicBold,
     fontSize: 11,
+    lineHeight: 14,
     marginTop: 2,
   },
 });
