@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
@@ -173,6 +173,57 @@ function asDoctor(
 }
 
 describe("bookings.create", () => {
+  test("allows booking a completed doctor profile that is not verified yet", async () => {
+    const { t, ids } = await seedBookingData();
+
+    await t.run(async (ctx) => {
+      await ctx.db.patch(ids.doctorId, {
+        isVerified: false,
+        isProfileComplete: true,
+      });
+    });
+
+    const bookingId = await asPatient(t, ids.patientUserId).mutation(
+      api.bookings.create,
+      {
+        doctorId: ids.doctorId,
+        clinicId: ids.clinicId,
+        appointmentDate: "2099-01-05",
+        appointmentTime: "09:00",
+        visitType: "first",
+      },
+    );
+
+    const booking = await t.run((ctx) => ctx.db.get(bookingId));
+    expect(booking).toMatchObject({
+      doctorId: ids.doctorId,
+      clinicId: ids.clinicId,
+      status: "confirmed",
+    });
+  });
+
+  test("rejects booking an incomplete doctor profile", async () => {
+    const { t, ids } = await seedBookingData();
+
+    await t.run(async (ctx) => {
+      await ctx.db.patch(ids.doctorId, {
+        isVerified: true,
+        isProfileComplete: false,
+        orderRegistrationNumber: "",
+      });
+    });
+
+    await expect(
+      asPatient(t, ids.patientUserId).mutation(api.bookings.create, {
+        doctorId: ids.doctorId,
+        clinicId: ids.clinicId,
+        appointmentDate: "2099-01-05",
+        appointmentTime: "09:00",
+        visitType: "first",
+      }),
+    ).rejects.toThrow(/incomplete|profile/i);
+  });
+
   test("rejects a clinic that does not belong to the requested doctor", async () => {
     const { t, ids } = await seedBookingData();
 
@@ -278,6 +329,223 @@ describe("bookings.reschedule", () => {
         newTime: "09:00",
       }),
     ).rejects.toThrow(/confirmed/i);
+  });
+});
+
+describe("doctor appointment filters", () => {
+  test("filters today's doctor worklist by patient search, status, and visit type", async () => {
+    const { t, ids } = await seedBookingData();
+
+    await t.run(async (ctx) => {
+      const familyProfileId = await ctx.db.insert("patientProfiles", {
+        parentUserId: ids.patientUserId,
+        fullNameAr: "طفل المريض",
+        dateOfBirth: "2018-01-01",
+        gender: "male",
+        chronicDiseases: [],
+        allergies: [],
+      });
+
+      await ctx.db.insert("bookings", {
+        patientId: ids.patientId,
+        doctorId: ids.doctorId,
+        clinicId: ids.clinicId,
+        appointmentDate: "2099-01-05",
+        appointmentTime: "09:00",
+        appointmentDuration: 30,
+        visitType: "first",
+        status: "confirmed",
+        confirmedAt: Date.now(),
+      });
+      await ctx.db.insert("bookings", {
+        patientId: ids.patientId,
+        doctorId: ids.doctorId,
+        clinicId: ids.clinicId,
+        profileId: familyProfileId,
+        appointmentDate: "2099-01-05",
+        appointmentTime: "10:00",
+        appointmentDuration: 30,
+        visitType: "followup",
+        status: "completed",
+        confirmedAt: Date.now(),
+      });
+    });
+
+    const result = await asDoctor(t, ids.doctorUserId).query(
+      api.bookings.listDoctorToday,
+      {
+        date: "2099-01-05",
+        query: "طفل",
+        status: "completed",
+        visitType: "followup",
+      },
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      appointmentTime: "10:00",
+      status: "completed",
+      visitType: "followup",
+      profileName: "طفل المريض",
+    });
+  });
+
+  test("applies the same patient filter contract to week and month doctor worklists", async () => {
+    const { t, ids } = await seedBookingData();
+
+    await t.run(async (ctx) => {
+      const familyProfileId = await ctx.db.insert("patientProfiles", {
+        parentUserId: ids.patientUserId,
+        fullNameAr: "طفل المريض",
+        dateOfBirth: "2018-01-01",
+        gender: "male",
+        chronicDiseases: [],
+        allergies: [],
+      });
+
+      await ctx.db.insert("bookings", {
+        patientId: ids.patientId,
+        doctorId: ids.doctorId,
+        clinicId: ids.clinicId,
+        profileId: familyProfileId,
+        appointmentDate: "2099-01-05",
+        appointmentTime: "10:00",
+        appointmentDuration: 30,
+        visitType: "consultation",
+        status: "confirmed",
+        confirmedAt: Date.now(),
+      });
+      await ctx.db.insert("bookings", {
+        patientId: ids.patientId,
+        doctorId: ids.doctorId,
+        clinicId: ids.clinicId,
+        appointmentDate: "2099-01-06",
+        appointmentTime: "11:00",
+        appointmentDuration: 30,
+        visitType: "first",
+        status: "confirmed",
+        confirmedAt: Date.now(),
+      });
+    });
+
+    const weekResult = await asDoctor(t, ids.doctorUserId).query(
+      api.bookings.listDoctorWeek,
+      {
+        startDate: "2099-01-03",
+        endDate: "2099-01-09",
+        query: "طفل",
+        visitType: "consultation",
+      },
+    );
+    const monthResult = await asDoctor(t, ids.doctorUserId).query(
+      api.bookings.listDoctorMonth,
+      {
+        year: 2099,
+        month: 1,
+        query: "طفل",
+        visitType: "consultation",
+      },
+    );
+
+    expect(weekResult.days).toHaveLength(1);
+    expect(weekResult.days[0].appointments).toHaveLength(1);
+    expect(weekResult.days[0].appointments[0].profileName).toBe("طفل المريض");
+
+    expect(monthResult.days).toHaveLength(1);
+    expect(monthResult.days[0].appointments).toHaveLength(1);
+    expect(monthResult.days[0].appointments[0].profileName).toBe("طفل المريض");
+  });
+
+  test("returns the Algerian Sunday-to-Saturday week range from Sunday", async () => {
+    const { t, ids } = await seedBookingData();
+
+    await t.run(async (ctx) => {
+      for (const [appointmentDate, appointmentTime] of [
+        ["2099-01-04", "09:00"],
+        ["2099-01-05", "10:00"],
+        ["2099-01-10", "11:00"],
+        ["2099-01-11", "12:00"],
+      ] as const) {
+        await ctx.db.insert("bookings", {
+          patientId: ids.patientId,
+          doctorId: ids.doctorId,
+          clinicId: ids.clinicId,
+          appointmentDate,
+          appointmentTime,
+          appointmentDuration: 30,
+          visitType: "first",
+          status: "confirmed",
+          confirmedAt: Date.now(),
+        });
+      }
+    });
+
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2099-01-04T12:00:00.000Z"));
+    try {
+      const result = await asDoctor(t, ids.doctorUserId).query(
+        api.bookings.listDoctorWeek,
+        {},
+      );
+
+      expect(result).toMatchObject({
+        startDate: "2099-01-04",
+        endDate: "2099-01-10",
+      });
+      expect(result.days.map((day) => day.date)).toEqual([
+        "2099-01-04",
+        "2099-01-05",
+        "2099-01-10",
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("returns the same Algerian week range from Monday", async () => {
+    const { t, ids } = await seedBookingData();
+
+    await t.run(async (ctx) => {
+      for (const [appointmentDate, appointmentTime] of [
+        ["2099-01-04", "09:00"],
+        ["2099-01-05", "10:00"],
+        ["2099-01-10", "11:00"],
+        ["2099-01-11", "12:00"],
+      ] as const) {
+        await ctx.db.insert("bookings", {
+          patientId: ids.patientId,
+          doctorId: ids.doctorId,
+          clinicId: ids.clinicId,
+          appointmentDate,
+          appointmentTime,
+          appointmentDuration: 30,
+          visitType: "first",
+          status: "confirmed",
+          confirmedAt: Date.now(),
+        });
+      }
+    });
+
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2099-01-05T12:00:00.000Z"));
+    try {
+      const result = await asDoctor(t, ids.doctorUserId).query(
+        api.bookings.listDoctorWeek,
+        {},
+      );
+
+      expect(result).toMatchObject({
+        startDate: "2099-01-04",
+        endDate: "2099-01-10",
+      });
+      expect(result.days.map((day) => day.date)).toEqual([
+        "2099-01-04",
+        "2099-01-05",
+        "2099-01-10",
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

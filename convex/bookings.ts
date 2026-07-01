@@ -1,6 +1,8 @@
 import { v, ConvexError } from "convex/values";
 import { query, mutation } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { getAuthedUserId, requireRole } from "./lib/auth";
+import { isPublicDoctorProfile } from "./lib/doctorVisibility";
 import type { Doc, Id } from "./_generated/dataModel";
 
 // ---------------------------------------------------------------------------
@@ -303,6 +305,25 @@ const bookingDoctorListFields = {
   profileName: v.optional(v.string()),
 } as const;
 
+const appointmentStatusValidator = v.union(
+  v.literal("confirmed"),
+  v.literal("cancelled"),
+  v.literal("completed"),
+  v.literal("no_show"),
+);
+
+const visitTypeValidator = v.union(
+  v.literal("first"),
+  v.literal("followup"),
+  v.literal("consultation"),
+);
+
+const doctorAppointmentFilterArgs = {
+  query: v.optional(v.string()),
+  status: v.optional(appointmentStatusValidator),
+  visitType: v.optional(visitTypeValidator),
+} as const;
+
 const specialtyFields = {
   _id: v.id("specialties"),
   _creationTime: v.number(),
@@ -311,6 +332,54 @@ const specialtyFields = {
   icon: v.string(),
   parentId: v.optional(v.id("specialties")),
 } as const;
+
+type DoctorAppointmentFilters = {
+  query?: string;
+  status?: Doc<"bookings">["status"];
+  visitType?: Doc<"bookings">["visitType"];
+};
+
+function matchesDoctorAppointmentFilters(
+  booking: Doc<"bookings">,
+  enriched: {
+    patientName: string;
+    patientPhone?: string;
+    profileName?: string;
+  },
+  filters: DoctorAppointmentFilters,
+) {
+  if (filters.status && booking.status !== filters.status) return false;
+  if (filters.visitType && booking.visitType !== filters.visitType) return false;
+
+  const query = filters.query?.trim();
+  if (!query) return true;
+
+  const haystack = [
+    enriched.patientName,
+    enriched.patientPhone,
+    enriched.profileName,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return haystack.includes(query.toLowerCase());
+}
+
+async function enrichAndFilterDoctorBookings(
+  ctx: any,
+  bookings: Doc<"bookings">[],
+  filters: DoctorAppointmentFilters,
+) {
+  const results = [];
+  for (const booking of bookings) {
+    const enriched = await enrichBookingWithPatient(ctx, booking);
+    if (matchesDoctorAppointmentFilters(booking, enriched, filters)) {
+      results.push(enriched);
+    }
+  }
+  return results;
+}
 
 // ---------------------------------------------------------------------------
 // Queries
@@ -542,14 +611,17 @@ export const listMyCancelled = query({
  * Auth required. Caller must have role "doctor".
  */
 export const listDoctorToday = query({
-  args: {},
+  args: {
+    date: v.optional(v.string()),
+    ...doctorAppointmentFilterArgs,
+  },
   returns: v.array(v.object(bookingDoctorListFields)),
-  handler: async (ctx) => {
+  handler: async (ctx, args) => {
     const user = await requireRole(ctx, ["doctor"]);
     const doctor = await getDoctorByUserId(ctx, user._id);
     if (!doctor) return [];
 
-    const today = todayString();
+    const today = args.date ?? todayString();
     const bookings = await ctx.db
       .query("bookings")
       .withIndex("by_doctorId_and_date", (q: any) =>
@@ -561,11 +633,7 @@ export const listDoctorToday = query({
       a.appointmentTime.localeCompare(b.appointmentTime),
     );
 
-    const results = [];
-    for (const b of sorted) {
-      results.push(await enrichBookingWithPatient(ctx, b));
-    }
-    return results;
+    return await enrichAndFilterDoctorBookings(ctx, sorted, args);
   },
 });
 
@@ -575,8 +643,14 @@ export const listDoctorToday = query({
  * Auth required. Caller must have role "doctor".
  */
 export const listDoctorWeek = query({
-  args: {},
+  args: {
+    startDate: v.optional(v.string()),
+    endDate: v.optional(v.string()),
+    ...doctorAppointmentFilterArgs,
+  },
   returns: v.object({
+    startDate: v.string(),
+    endDate: v.string(),
     days: v.array(
       v.object({
         date: v.string(),
@@ -584,13 +658,13 @@ export const listDoctorWeek = query({
       }),
     ),
   }),
-  handler: async (ctx) => {
+  handler: async (ctx, args) => {
     const user = await requireRole(ctx, ["doctor"]);
     const doctor = await getDoctorByUserId(ctx, user._id);
-    if (!doctor) return { days: [] };
 
-    const start = weekStartString();
-    const end = weekEndString();
+    const start = args.startDate ?? weekStartString();
+    const end = args.endDate ?? weekEndString();
+    if (!doctor) return { startDate: start, endDate: end, days: [] };
 
     // Collect all bookings for the doctor within the week range
     const weekBookings = await ctx.db
@@ -619,14 +693,17 @@ export const listDoctorWeek = query({
       const sortedAppts = grouped[date].sort((a, b) =>
         a.appointmentTime.localeCompare(b.appointmentTime),
       );
-      const enriched = [];
-      for (const appt of sortedAppts) {
-        enriched.push(await enrichBookingWithPatient(ctx, appt));
+      const enriched = await enrichAndFilterDoctorBookings(
+        ctx,
+        sortedAppts,
+        args,
+      );
+      if (enriched.length > 0) {
+        days.push({ date, appointments: enriched });
       }
-      days.push({ date, appointments: enriched });
     }
 
-    return { days };
+    return { startDate: start, endDate: end, days };
   },
 });
 
@@ -637,7 +714,11 @@ export const listDoctorWeek = query({
  * Auth required. Caller must have role "doctor".
  */
 export const listDoctorMonth = query({
-  args: { year: v.number(), month: v.number() },
+  args: {
+    year: v.number(),
+    month: v.number(),
+    ...doctorAppointmentFilterArgs,
+  },
   returns: v.object({
     days: v.array(
       v.object({
@@ -658,16 +739,15 @@ export const listDoctorMonth = query({
     const monthStart = `${args.year}-${String(args.month).padStart(2, "0")}-01`;
     const monthEnd = monthEndString(args.year, args.month);
 
-    const allBookings = await ctx.db
+    const monthBookings = await ctx.db
       .query("bookings")
       .withIndex("by_doctorId_and_date", (q: any) =>
-        q.eq("doctorId", doctor._id),
+        q
+          .eq("doctorId", doctor._id)
+          .gte("appointmentDate", monthStart)
+          .lte("appointmentDate", monthEnd),
       )
       .collect();
-
-    const monthBookings = allBookings.filter(
-      (b) => b.appointmentDate >= monthStart && b.appointmentDate <= monthEnd,
-    );
 
     // Group by date with counts per status
     const grouped: Record<
@@ -704,16 +784,20 @@ export const listDoctorMonth = query({
       const sortedAppts = grouped[date].appointments.sort((a, b) =>
         a.appointmentTime.localeCompare(b.appointmentTime),
       );
-      const enriched = [];
-      for (const appt of sortedAppts) {
-        enriched.push(await enrichBookingWithPatient(ctx, appt));
+      const enriched = await enrichAndFilterDoctorBookings(
+        ctx,
+        sortedAppts,
+        args,
+      );
+      if (enriched.length === 0) {
+        continue;
       }
       days.push({
         date,
-        total: grouped[date].total,
-        confirmed: grouped[date].confirmed,
-        completed: grouped[date].completed,
-        cancelled: grouped[date].cancelled,
+        total: enriched.length,
+        confirmed: enriched.filter((b) => b.status === "confirmed").length,
+        completed: enriched.filter((b) => b.status === "completed").length,
+        cancelled: enriched.filter((b) => b.status === "cancelled").length,
         appointments: enriched,
       });
     }
@@ -902,7 +986,7 @@ export const getHomeData = query({
       }
     }
 
-    // ----- Nearby doctors (same wilaya, verified) -----
+    // ----- Nearby doctors (same wilaya, completed public profile) -----
     const nearbyDoctors: any[] = [];
     if (user.wilayaId) {
       const nearbyClinics = await ctx.db
@@ -917,7 +1001,7 @@ export const getHomeData = query({
         seenDoctorIds.add(clinic.doctorId);
 
         const doctor = await ctx.db.get(clinic.doctorId);
-        if (!doctor || !doctor.isVerified) continue;
+        if (!doctor || !isPublicDoctorProfile(doctor)) continue;
 
         const docUser = await ctx.db.get(doctor.userId);
         const specialty = await ctx.db.get(doctor.specialtyId);
@@ -1086,8 +1170,8 @@ export const create = mutation({
     if (!doctor) {
       throw new ConvexError("Doctor not found.");
     }
-    if (!doctor.isVerified) {
-      throw new ConvexError("Cannot book with an unverified doctor.");
+    if (!isPublicDoctorProfile(doctor)) {
+      throw new ConvexError("Cannot book with an incomplete doctor profile.");
     }
     if (!clinic) {
       throw new ConvexError("Clinic not found.");
@@ -1130,19 +1214,19 @@ export const create = mutation({
       confirmedAt: now,
     });
 
-    // --- Insert notification for the doctor ---
-    await ctx.db.insert("notifications", {
+    // --- Notify doctor ---
+    await ctx.runMutation(internal.notifications.create, {
       userId: doctor.userId,
       type: "new_booking",
       title: "Nouvelle réservation",
       body: `Un patient a réservé pour le ${args.appointmentDate} à ${args.appointmentTime}`,
       data: {
         bookingId,
+        doctorId: args.doctorId,
         clinicId: args.clinicId,
         appointmentDate: args.appointmentDate,
         appointmentTime: args.appointmentTime,
       },
-      isRead: false,
     });
 
     return bookingId;
@@ -1203,23 +1287,23 @@ export const cancel = mutation({
     // Notify the other party
     if (isPatient && doctor) {
       // Notify doctor
-      await ctx.db.insert("notifications", {
+      await ctx.runMutation(internal.notifications.create, {
         userId: doctor.userId,
         type: "booking_cancelled",
         title: "Réservation annulée",
         body: `Un patient a annulé sa réservation du ${booking.appointmentDate} à ${booking.appointmentTime}.`,
         data: {
           bookingId: args.bookingId,
+          doctorId: booking.doctorId,
           clinicId: booking.clinicId,
           cancelledBy: "patient",
         },
-        isRead: false,
       });
     } else if (isDoctor && patient) {
       // Notify patient
       const patientUser = await ctx.db.get(patient.userId);
       if (patientUser) {
-        await ctx.db.insert("notifications", {
+        await ctx.runMutation(internal.notifications.create, {
           userId: patientUser._id,
           type: "booking_cancelled",
           title: "Réservation annulée",
@@ -1229,7 +1313,6 @@ export const cancel = mutation({
             clinicId: booking.clinicId,
             cancelledBy: "doctor",
           },
-          isRead: false,
         });
       }
     }
@@ -1279,7 +1362,7 @@ export const markCompleted = mutation({
     // Notify the patient asking for a review
     const patient = await ctx.db.get(booking.patientId);
     if (patient) {
-      await ctx.db.insert("notifications", {
+      await ctx.runMutation(internal.notifications.create, {
         userId: patient.userId,
         type: "booking_completed",
         title: "Consultation terminee",
@@ -1289,7 +1372,6 @@ export const markCompleted = mutation({
           doctorId: booking.doctorId,
           clinicId: booking.clinicId,
         },
-        isRead: false,
       });
     }
 
@@ -1447,7 +1529,7 @@ export const reschedule = mutation({
     // --- Notify doctor about reschedule ---
     const doctor = await ctx.db.get(oldBooking.doctorId);
     if (doctor) {
-      await ctx.db.insert("notifications", {
+      await ctx.runMutation(internal.notifications.create, {
         userId: doctor.userId,
         type: "booking_rescheduled",
         title: "Réservation modifiée",
@@ -1455,11 +1537,11 @@ export const reschedule = mutation({
         data: {
           oldBookingId: args.bookingId,
           newBookingId,
+          doctorId: oldBooking.doctorId,
           clinicId: oldBooking.clinicId,
           newDate: args.newDate,
           newTime: args.newTime,
         },
-        isRead: false,
       });
     }
 

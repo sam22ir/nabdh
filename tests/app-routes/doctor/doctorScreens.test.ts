@@ -156,6 +156,66 @@ describe("doctor screens use backend data", () => {
     expect(source).not.toContain("setTimeout");
   });
 
+  test("appointments patient filters are sent to Convex worklist queries", () => {
+    const source = readFileSync(
+      join(process.cwd(), "app/(doctor)/appointments.tsx"),
+      "utf8",
+    );
+
+    expect(source).toContain("patientSearchText");
+    expect(source).toContain("selectedStatus");
+    expect(source).toContain("selectedVisitType");
+    expect(source).toContain("doctorAppointmentFilterArgs");
+    expect(source).toContain("api.bookings.listDoctorToday");
+    expect(source).toContain("api.bookings.listDoctorWeek");
+    expect(source).toContain("api.bookings.listDoctorMonth");
+    expect(source).toContain("query: normalizedPatientSearch || undefined");
+    expect(source).toContain("status: selectedStatus ?? undefined");
+    expect(source).toContain("visitType: selectedVisitType ?? undefined");
+    expect(source).toContain("ابحث باسم المريض أو رقم الهاتف");
+    expect(source).toContain("حالة الموعد");
+    expect(source).toContain("نوع الزيارة");
+    expect(source).not.toContain("filteredAppointments");
+    expect(source).not.toContain("patientName.includes");
+  });
+
+  test("appointments patient filters collapse dynamically while scrolling the worklist", () => {
+    const source = readFileSync(
+      join(process.cwd(), "app/(doctor)/appointments.tsx"),
+      "utf8",
+    );
+    const renderSource = source.slice(
+      source.indexOf("return (\n    <SafeAreaView"),
+      source.indexOf("// =============================================================================\n// Styles"),
+    );
+
+    expect(source).toContain("filtersCollapsed");
+    expect(source).toContain("setFiltersCollapsed");
+    expect(source).toContain("lastWorklistScrollYRef");
+    expect(source).toContain("handleWorklistScroll");
+    expect(source).toContain("onScroll={handleWorklistScroll}");
+    expect(source).toContain("scrollEventThrottle={16}");
+    expect(source).toContain("إظهار الفلاتر");
+    expect(source).toContain("activeFilterCount");
+    expect(renderSource.indexOf("<ScrollView")).toBeLessThan(
+      renderSource.indexOf("<DoctorHeader"),
+    );
+  });
+
+  test("appointments week view uses backend Sunday-start boundaries", () => {
+    const source = readFileSync(
+      join(process.cwd(), "app/(doctor)/appointments.tsx"),
+      "utf8",
+    );
+
+    expect(source).toContain("@/lib/doctorAppointmentWeeks");
+    expect(source).toContain("buildDoctorWeekSections");
+    expect(source).toContain("startDate: weekData.startDate");
+    expect(source).toContain("endDate: weekData.endDate");
+    expect(source).not.toContain("diffToMonday");
+    expect(source).not.toContain("Monday start");
+  });
+
   test("schedule screen is backed by Convex schedules instead of local fixtures", () => {
     const source = readFileSync(
       join(process.cwd(), "app/(doctor)/schedule.tsx"),

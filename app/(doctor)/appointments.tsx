@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -6,6 +6,8 @@ import {
   LayoutAnimation,
   ListRenderItemInfo,
   Modal,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Platform,
   Pressable,
   RefreshControl,
@@ -32,6 +34,7 @@ import {
 } from '@/components/doctor-ui';
 import { theme } from '@/lib/theme';
 import { rtlTextAlign } from '@/lib/rtl';
+import { buildDoctorWeekSections, type DoctorWeekSection } from '@/lib/doctorAppointmentWeeks';
 import type { Appointment, AppointmentStatus, VisitType } from '@/lib/types';
 import type { Id } from '@/convex/_generated/dataModel';
 
@@ -97,8 +100,17 @@ const STATUS_CONFIG: Record<
 };
 
 type ViewTab = 'today' | 'week' | 'month';
+type NullableStatus = AppointmentStatus | null;
+type NullableVisitType = VisitType | null;
 type AppointmentTabOption = SegmentOption<ViewTab> & {
   icon: keyof typeof Ionicons.glyphMap;
+};
+type StatusFilterOption = SegmentOption<'all' | AppointmentStatus>;
+type VisitTypeFilterOption = SegmentOption<'all' | VisitType>;
+type DoctorAppointmentFilterArgs = {
+  normalizedPatientSearch: string;
+  selectedStatus: NullableStatus;
+  selectedVisitType: NullableVisitType;
 };
 
 const TABS: AppointmentTabOption[] = [
@@ -106,6 +118,33 @@ const TABS: AppointmentTabOption[] = [
   { key: 'week', label: 'الأسبوع', icon: 'calendar' },
   { key: 'month', label: 'الشهر', icon: 'calendar-outline' },
 ];
+
+const STATUS_FILTER_OPTIONS: StatusFilterOption[] = [
+  { key: 'all', label: 'الكل', icon: 'list-outline' },
+  { key: 'confirmed', label: STATUS_CONFIG.confirmed.label, icon: 'checkmark-circle-outline' },
+  { key: 'completed', label: STATUS_CONFIG.completed.label, icon: 'checkmark-done-outline' },
+  { key: 'cancelled', label: STATUS_CONFIG.cancelled.label, icon: 'ban-outline' },
+  { key: 'no_show', label: STATUS_CONFIG.no_show.label, icon: 'close-circle-outline' },
+];
+
+const VISIT_TYPE_FILTER_OPTIONS: VisitTypeFilterOption[] = [
+  { key: 'all', label: 'الكل', icon: 'layers-outline' },
+  { key: 'first', label: VISIT_TYPE_LABELS.first, icon: 'person-add-outline' },
+  { key: 'followup', label: VISIT_TYPE_LABELS.followup, icon: 'repeat-outline' },
+  { key: 'consultation', label: VISIT_TYPE_LABELS.consultation, icon: 'chatbubbles-outline' },
+];
+
+function buildDoctorAppointmentFilterArgs({
+  normalizedPatientSearch,
+  selectedStatus,
+  selectedVisitType,
+}: DoctorAppointmentFilterArgs) {
+  return {
+    query: normalizedPatientSearch || undefined,
+    status: selectedStatus ?? undefined,
+    visitType: selectedVisitType ?? undefined,
+  };
+}
 
 // =============================================================================
 // Types
@@ -150,13 +189,7 @@ interface ConvexDoctorBooking {
   profileName?: string;
 }
 
-/** Week section for SectionList. */
-interface WeekSection {
-  title: string;
-  date: string;
-  dayName: string;
-  data: DashboardAppointment[];
-}
+type WeekSection = DoctorWeekSection<DashboardAppointment>;
 
 // =============================================================================
 // Helpers
@@ -217,47 +250,6 @@ function getStatusTone(status: AppointmentStatus): MetricItem['tone'] {
   if (status === 'cancelled') return 'danger';
   if (status === 'no_show') return 'warning';
   return 'info';
-}
-
-/** Build week sections grouped by day. */
-function getWeekSections(
-  weekDays: { date: string; appointments: ConvexDoctorBooking[] }[],
-): WeekSection[] {
-  const todayDate = todayString();
-  const today = new Date(todayDate + 'T00:00:00');
-  const startOfWeek = new Date(today);
-  // Monday start for Arabic locale
-  const dayOfWeek = today.getDay(); // 0=Sun
-  const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-  startOfWeek.setDate(today.getDate() + diffToMonday);
-
-  const weekDates: string[] = [];
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(startOfWeek);
-    d.setDate(startOfWeek.getDate() + i);
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    weekDates.push(`${yyyy}-${mm}-${dd}`);
-  }
-
-  const grouped = new Map(
-    weekDays.map((day) => [
-      day.date,
-      sortAppointments(day.appointments.map(toDashboardAppointment)),
-    ]),
-  );
-
-  return weekDates.map((dateStr) => {
-    const d = new Date(dateStr + 'T00:00:00');
-    const dayName = ARABIC_DAYS[d.getDay()];
-    return {
-      title: `${dayName} ${d.getDate()} ${ARABIC_MONTHS[d.getMonth()]}`,
-      date: dateStr,
-      dayName,
-      data: grouped.get(dateStr) ?? [],
-    };
-  });
 }
 
 /** Get days in month with appointments for the calendar grid. */
@@ -670,11 +662,32 @@ export default function DoctorAppointmentsScreen() {
     const now = new Date();
     return { year: now.getFullYear(), month: now.getMonth() };
   });
-  const todayData = useQuery(api.bookings.listDoctorToday, {});
-  const weekData = useQuery(api.bookings.listDoctorWeek, {});
+  const [patientSearchText, setPatientSearchText] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState<NullableStatus>(null);
+  const [selectedVisitType, setSelectedVisitType] =
+    useState<NullableVisitType>(null);
+  const [filtersCollapsed, setFiltersCollapsed] = useState(false);
+  const lastWorklistScrollYRef = useRef(0);
+  const normalizedPatientSearch = patientSearchText.trim();
+  const doctorAppointmentFilterArgs = useMemo(
+    () =>
+      buildDoctorAppointmentFilterArgs({
+        normalizedPatientSearch,
+        selectedStatus,
+        selectedVisitType,
+      }),
+    [normalizedPatientSearch, selectedStatus, selectedVisitType],
+  );
+  const todayData = useQuery(api.bookings.listDoctorToday, {
+    ...doctorAppointmentFilterArgs,
+  });
+  const weekData = useQuery(api.bookings.listDoctorWeek, {
+    ...doctorAppointmentFilterArgs,
+  });
   const monthData = useQuery(api.bookings.listDoctorMonth, {
     year: monthYear.year,
     month: monthYear.month + 1,
+    ...doctorAppointmentFilterArgs,
   });
   const markCompleted = useMutation(api.bookings.markCompleted);
   const markNoShow = useMutation(api.bookings.markNoShow);
@@ -691,6 +704,11 @@ export default function DoctorAppointmentsScreen() {
   const [selectedDayAppointments, setSelectedDayAppointments] = useState<
     DashboardAppointment[] | null
   >(null);
+  const activeFilterCount = [
+    normalizedPatientSearch,
+    selectedStatus,
+    selectedVisitType,
+  ].filter(Boolean).length;
 
   // ── Derived data ──────────────────────────────────────────────────────
   const todayList = useMemo(
@@ -699,7 +717,16 @@ export default function DoctorAppointmentsScreen() {
   );
 
   const weekSections = useMemo(
-    () => getWeekSections(weekData?.days ?? []),
+    () =>
+      weekData
+        ? buildDoctorWeekSections({
+            startDate: weekData.startDate,
+            endDate: weekData.endDate,
+            days: weekData.days,
+            mapAppointment: toDashboardAppointment,
+            sortAppointments,
+          })
+        : [],
     [weekData],
   );
 
@@ -736,6 +763,31 @@ export default function DoctorAppointmentsScreen() {
     setRefreshing(true);
     queueMicrotask(() => setRefreshing(false));
   }, []);
+
+  const handleClearPatientFilters = useCallback(() => {
+    setPatientSearchText('');
+    setSelectedStatus(null);
+    setSelectedVisitType(null);
+  }, []);
+
+  const handleWorklistScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const currentY = Math.max(0, event.nativeEvent.contentOffset.y);
+      const previousY = lastWorklistScrollYRef.current;
+      const deltaY = currentY - previousY;
+
+      if (currentY <= 12) {
+        setFiltersCollapsed(false);
+      } else if (deltaY > 16) {
+        setFiltersCollapsed(true);
+      } else if (deltaY < -16) {
+        setFiltersCollapsed(false);
+      }
+
+      lastWorklistScrollYRef.current = currentY;
+    },
+    [],
+  );
 
   // ── Appointment action handlers ───────────────────────────────────────
   const handleMarkCompleted = useCallback(
@@ -871,26 +923,12 @@ export default function DoctorAppointmentsScreen() {
   // ── Main render ──────────────────────────────────────────────────────
   return (
     <SafeAreaView style={styles.safeArea}>
-      <DoctorHeader
-        eyebrow="قائمة المواعيد"
-        title="مواعيد العيادة"
-        subtitle={`${formatArabicDate(todayDate)} · فرز حسب الفترة وحالة الموعد.`}
-        icon="calendar-outline"
-      />
-
-      <DoctorSection title="فرز حسب الفترة">
-        <SegmentedControl
-          options={TABS}
-          value={activeTab}
-          onChange={setActiveTab}
-        />
-      </DoctorSection>
-
-      {/* ── Content ───────────────────────────────────────────────── */}
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        onScroll={handleWorklistScroll}
+        scrollEventThrottle={16}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -900,6 +938,129 @@ export default function DoctorAppointmentsScreen() {
           />
         }
       >
+        <DoctorHeader
+          eyebrow="قائمة المواعيد"
+          title="مواعيد العيادة"
+          subtitle={`${formatArabicDate(todayDate)} · فرز حسب الفترة وحالة الموعد.`}
+          icon="calendar-outline"
+        />
+
+      <DoctorSection title="فرز حسب الفترة">
+        <SegmentedControl
+          options={TABS}
+          value={activeTab}
+          onChange={setActiveTab}
+        />
+      </DoctorSection>
+
+      <DoctorSection
+        title="فلترة المرضى"
+        subtitle={
+          filtersCollapsed
+            ? 'الفلاتر مخفية أثناء تصفح القائمة.'
+            : 'ابحث باسم المريض أو رقم الهاتف ثم ضيق النتائج حسب الحالة أو نوع الزيارة.'
+        }
+        action={
+          activeFilterCount > 0 ? (
+            <Pressable
+              onPress={handleClearPatientFilters}
+              accessibilityRole="button"
+              accessibilityLabel="إزالة فلاتر المرضى"
+              style={({ pressed }) => [
+                styles.clearFiltersButton,
+                pressed && styles.clearFiltersButtonPressed,
+              ]}
+            >
+              <Ionicons
+                name="close-circle-outline"
+                size={15}
+                color={theme.colors.danger}
+              />
+              <Text style={styles.clearFiltersText}>إزالة</Text>
+            </Pressable>
+          ) : null
+        }
+      >
+        {filtersCollapsed ? (
+          <Pressable
+            onPress={() => setFiltersCollapsed(false)}
+            accessibilityRole="button"
+            accessibilityLabel="إظهار الفلاتر"
+            style={({ pressed }) => [
+              styles.collapsedFiltersButton,
+              pressed && styles.collapsedFiltersButtonPressed,
+            ]}
+          >
+            <View style={styles.collapsedFiltersCopy}>
+              <Ionicons
+                name="options-outline"
+                size={16}
+                color={theme.colors.official}
+              />
+              <Text style={styles.collapsedFiltersText}>إظهار الفلاتر</Text>
+            </View>
+            <Text style={styles.collapsedFiltersMeta}>
+              {activeFilterCount > 0
+                ? `${activeFilterCount} مفعلة`
+                : 'كل المواعيد'}
+            </Text>
+          </Pressable>
+        ) : (
+          <>
+            <View style={styles.patientSearchBox}>
+              <Ionicons name="search" size={18} color={theme.colors.textMuted} />
+              <TextInput
+                value={patientSearchText}
+                onChangeText={setPatientSearchText}
+                placeholder="ابحث باسم المريض أو رقم الهاتف"
+                placeholderTextColor={theme.colors.textMuted}
+                style={styles.patientSearchInput}
+                textAlign="right"
+                returnKeyType="search"
+                accessibilityLabel="بحث في المرضى"
+              />
+              {patientSearchText ? (
+                <Pressable
+                  onPress={() => setPatientSearchText('')}
+                  accessibilityRole="button"
+                  accessibilityLabel="مسح بحث المرضى"
+                  hitSlop={8}
+                >
+                  <Ionicons
+                    name="close-circle"
+                    size={18}
+                    color={theme.colors.textMuted}
+                  />
+                </Pressable>
+              ) : null}
+            </View>
+
+            <View style={styles.filterGroup}>
+              <Text style={styles.filterGroupLabel}>حالة الموعد</Text>
+              <SegmentedControl
+                options={STATUS_FILTER_OPTIONS}
+                value={selectedStatus ?? 'all'}
+                onChange={(value) =>
+                  setSelectedStatus(value === 'all' ? null : value)
+                }
+              />
+            </View>
+
+            <View style={styles.filterGroup}>
+              <Text style={styles.filterGroupLabel}>نوع الزيارة</Text>
+              <SegmentedControl
+                options={VISIT_TYPE_FILTER_OPTIONS}
+                value={selectedVisitType ?? 'all'}
+                onChange={(value) =>
+                  setSelectedVisitType(value === 'all' ? null : value)
+                }
+              />
+            </View>
+          </>
+        )}
+      </DoctorSection>
+
+        {/* ── Content ───────────────────────────────────────────────── */}
         <DoctorSection
           title="قائمة المواعيد"
           subtitle="استخدمها للفرز، المتابعة، وإضافة ملاحظات الطبيب"
@@ -1116,6 +1277,83 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: theme.colors.textSecondary,
     textAlign: rtlTextAlign(),
+  },
+  clearFiltersButton: {
+    minHeight: 32,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.sm,
+  },
+  clearFiltersButtonPressed: {
+    opacity: 0.75,
+  },
+  clearFiltersText: {
+    fontFamily: theme.typography.fontFamily.arabicBold,
+    fontSize: 12,
+    color: theme.colors.danger,
+  },
+  collapsedFiltersButton: {
+    minHeight: 42,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.surfaceRaised,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+  },
+  collapsedFiltersButtonPressed: {
+    opacity: 0.75,
+  },
+  collapsedFiltersCopy: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: theme.spacing.xs,
+  },
+  collapsedFiltersText: {
+    fontFamily: theme.typography.fontFamily.arabicBold,
+    fontSize: 13,
+    color: theme.colors.official,
+    textAlign: rtlTextAlign(),
+  },
+  collapsedFiltersMeta: {
+    fontFamily: theme.typography.fontFamily.arabic,
+    fontSize: 12,
+    color: theme.colors.textMuted,
+  },
+  patientSearchBox: {
+    minHeight: 46,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.surfaceRaised,
+    paddingHorizontal: theme.spacing.md,
+    marginBottom: theme.spacing.md,
+  },
+  patientSearchInput: {
+    flex: 1,
+    minWidth: 0,
+    fontFamily: theme.typography.fontFamily.arabic,
+    fontSize: 14,
+    color: theme.colors.textPrimary,
+    paddingVertical: theme.spacing.sm,
+  },
+  filterGroup: {
+    marginTop: theme.spacing.xs,
+  },
+  filterGroupLabel: {
+    fontFamily: theme.typography.fontFamily.arabicBold,
+    fontSize: 12,
+    color: theme.colors.textMuted,
+    textAlign: rtlTextAlign(),
+    marginBottom: theme.spacing.xs,
   },
 
   // ─── Segment Tabs ───────────────────────────────────────────────────────
