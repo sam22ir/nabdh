@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 
 describe("production readiness docs", () => {
-  test("documents setup commands, Convex Auth env vars, and seed data", () => {
+  test("documents setup commands, Clerk env vars, and seed data", () => {
     const readmePath = join(process.cwd(), "README.md");
     expect(existsSync(readmePath)).toBe(true);
 
@@ -19,8 +19,7 @@ describe("production readiness docs", () => {
 
     expect(envExample).toContain("EXPO_PUBLIC_CONVEX_URL");
     expect(envExample).toContain("CONVEX_DEPLOYMENT");
-    expect(envExample).toContain("CONVEX_SITE_URL");
-    expect(envExample).toContain("JWT_PRIVATE_KEY");
-    expect(envExample).toContain("JWKS");
+    expect(envExample).toContain("EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY");
+    expect(envExample).toContain("CLERK_JWT_ISSUER_DOMAIN");
   });
 });

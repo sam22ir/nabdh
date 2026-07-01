@@ -1,7 +1,7 @@
 # Nabdh
 
 Nabdh is an Expo SDK 56 React Native app for medical appointment booking in Algeria.
-It uses Expo Router, Convex backend, Convex Auth, and an Arabic-first RTL UI.
+It uses Expo Router, Convex backend, Clerk authentication, and an Arabic-first RTL UI.
 
 ## Requirements
 
@@ -37,8 +37,8 @@ Required variables are documented in `.env.example`.
 
 - `CONVEX_DEPLOYMENT`: Convex deployment name for local development.
 - `EXPO_PUBLIC_CONVEX_URL`: public Convex deployment URL consumed by the Expo client.
-- `CONVEX_SITE_URL`: Convex Auth issuer/site URL used by `convex/auth.config.ts`.
-- `JWT_PRIVATE_KEY` and `JWKS`: Convex Auth signing keys. Generate real values with the Convex Auth CLI and never commit them.
+- `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY`: Clerk publishable key consumed by the Expo client.
+- `CLERK_JWT_ISSUER_DOMAIN`: Clerk Frontend API URL from the Clerk Convex integration page. Set it in Convex with `npx convex env set CLERK_JWT_ISSUER_DOMAIN <url>`.
 
 Local secret files such as `.env`, `.env.local`, and `.env*.local` are ignored by git.
 
@@ -86,6 +86,12 @@ Run Expo project checks:
 ```bash
 npx expo-doctor
 ```
+
+## Push Notifications
+
+In-app notification rows are stored in Convex. Remote push delivery uses `expo-notifications`, Expo push tokens, and the Convex `pushDelivery` internal action.
+
+For Expo SDK 56, Android push notifications require a development build or production build; Expo Go on Android does not support remote push. Configure EAS project credentials before validating device delivery. Expo web remains a no-op for push registration.
 
 ## Backend Status
 

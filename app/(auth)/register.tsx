@@ -12,18 +12,24 @@ import {
   FlatList,
   Pressable,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { makeRedirectUri } from 'expo-auth-session';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useAuthActions } from '@convex-dev/auth/react';
-import { useConvexAuth, useMutation, useQuery } from 'convex/react';
+import { isClerkAPIResponseError, useSSO, useSignUp } from '@clerk/clerk-expo';
+import { useConvex, useConvexAuth, useMutation, useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { theme } from '../../src/lib/theme';
 import { rtlValue } from '../../src/lib/rtl';
 import { getArabicErrorMessage } from '../../src/lib/errorMessages';
+import {
+  normalizeEmailForAuth,
+  normalizePhoneForAuth,
+} from '../../src/lib/authIdentifiers';
 import type { UserRole } from '../../src/lib/types';
 import type { Id } from '../../convex/_generated/dataModel';
 
@@ -45,9 +51,23 @@ const passwordMatchRefine = (data: {
   }
 };
 
+const phoneSchema = z.string().refine(
+  (phone) => {
+    try {
+      normalizePhoneForAuth(phone);
+      return true;
+    } catch {
+      return false;
+    }
+  },
+  'يرجى إدخال رقم هاتف جزائري يبدأ بـ 05 أو 06 أو 07 أو +213',
+);
+const emailSchema = z.email('يرجى إدخال بريد إلكتروني صالح');
+
 const step1Schema = z.object({
   fullName: z.string().min(2, 'الاسم يجب أن يكون حرفين على الأقل'),
-  email: z.email('يرجى إدخال بريد إلكتروني صالح'),
+  phone: phoneSchema,
+  email: emailSchema,
   password: z.string().min(6, 'كلمة المرور يجب أن تكون 6 أحرف على الأقل'),
   confirmPassword: z.string(),
 }).superRefine(passwordMatchRefine);
@@ -57,31 +77,142 @@ const step2Schema = z.object({
   communeId: z.string({ message: 'يرجى اختيار بلديتك' }).min(1, 'يرجى اختيار بلديتك'),
   dateOfBirth: z.string().optional(),
   gender: z.union([z.literal('male'), z.literal('female')]).optional(),
+  specialtyId: z.string().optional(),
+  orderRegistrationNumber: z.string().optional(),
 });
 
 const fullSchema = z.object({
   fullName: z.string().min(2, 'الاسم يجب أن يكون حرفين على الأقل'),
-  email: z.email('يرجى إدخال بريد إلكتروني صالح'),
+  phone: phoneSchema,
+  email: emailSchema,
   password: z.string().min(6, 'كلمة المرور يجب أن تكون 6 أحرف على الأقل'),
   confirmPassword: z.string(),
   wilayaId: z.string({ message: 'يرجى اختيار ولايتك' }).min(1, 'يرجى اختيار ولايتك'),
   communeId: z.string({ message: 'يرجى اختيار بلديتك' }).min(1, 'يرجى اختيار بلديتك'),
   dateOfBirth: z.string().optional(),
   gender: z.union([z.literal('male'), z.literal('female')]).optional(),
+  specialtyId: z.string().optional(),
+  orderRegistrationNumber: z.string().optional(),
 }).superRefine(passwordMatchRefine);
 
 type FormData = z.output<typeof fullSchema>;
 
 type RegistrationPayload = {
   fullNameAr: string;
+  phone: string;
+  email: string;
   role: UserRole;
   wilayaId: Id<'wilayas'>;
   communeId?: Id<'communes'>;
   dateOfBirth?: string;
   gender?: 'male' | 'female';
+  specialtyId?: Id<'specialties'>;
+  orderRegistrationNumber?: string;
 };
 
+class RegistrationFormError extends Error {}
+
+function buildRegistrationPayload(data: FormData, role?: UserRole) {
+  const resolvedRole = role === 'doctor' ? 'doctor' : 'patient';
+
+  if (resolvedRole === 'patient' && !data.dateOfBirth?.trim()) {
+    throw new RegistrationFormError('يرجى إدخال تاريخ الميلاد');
+  }
+  if (resolvedRole === 'patient' && !data.gender) {
+    throw new RegistrationFormError('يرجى اختيار الجنس');
+  }
+  if (resolvedRole === 'doctor' && !data.specialtyId) {
+    throw new RegistrationFormError('يرجى اختيار التخصص');
+  }
+  if (
+    resolvedRole === 'doctor' &&
+    (!data.orderRegistrationNumber ||
+      data.orderRegistrationNumber.trim().length < 3)
+  ) {
+    throw new RegistrationFormError('يرجى إدخال رقم التسجيل في النقابة');
+  }
+
+  const phoneAuthIdentifier = normalizePhoneForAuth(data.phone);
+  const emailAuthIdentifier = normalizeEmailForAuth(data.email);
+  const registrationPayload: RegistrationPayload = {
+    fullNameAr: data.fullName.trim(),
+    phone: data.phone,
+    email: emailAuthIdentifier,
+    role: resolvedRole,
+    wilayaId: data.wilayaId as Id<'wilayas'>,
+    communeId:
+      resolvedRole === 'patient'
+        ? (data.communeId as Id<'communes'>)
+        : undefined,
+    dateOfBirth: data.dateOfBirth,
+    gender: data.gender,
+    specialtyId:
+      resolvedRole === 'doctor'
+        ? (data.specialtyId as Id<'specialties'>)
+        : undefined,
+    orderRegistrationNumber:
+      resolvedRole === 'doctor'
+        ? data.orderRegistrationNumber?.trim()
+        : undefined,
+  };
+
+  return {
+    emailAuthIdentifier,
+    phoneAuthIdentifier,
+    registrationPayload,
+  };
+}
+
 function getRegistrationErrorMessage(err: unknown) {
+  if (err instanceof RegistrationFormError) {
+    return err.message;
+  }
+
+  if (isClerkAPIResponseError(err)) {
+    const clerkError = err.errors[0] as {
+      code?: string;
+      message?: string;
+      longMessage?: string;
+    } | undefined;
+    const code = clerkError?.code ?? '';
+    const message = [
+      clerkError?.message,
+      clerkError?.longMessage,
+      code,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+
+    if (
+      code.includes('identifier_exists') ||
+      message.includes('already exists') ||
+      message.includes('already taken')
+    ) {
+      return 'البريد الإلكتروني مستخدم بالفعل';
+    }
+    if (
+      code.includes('verification') ||
+      code.includes('code') ||
+      message.includes('verification') ||
+      message.includes('code')
+    ) {
+      return 'رمز التحقق غير صحيح أو منتهي الصلاحية.';
+    }
+    if (
+      code.includes('form_password') ||
+      message.includes('password')
+    ) {
+      return 'كلمة المرور غير مقبولة. جرّب كلمة مرور أقوى.';
+    }
+    if (
+      code.includes('form_identifier') ||
+      message.includes('email')
+    ) {
+      return 'تحقق من البريد الإلكتروني ثم حاول مرة أخرى.';
+    }
+  }
+
   const message =
     err instanceof Error
       ? err.message
@@ -91,6 +222,10 @@ function getRegistrationErrorMessage(err: unknown) {
 
   return message.includes('already')
     ? 'البريد الإلكتروني مستخدم بالفعل'
+    : message.toLowerCase().includes('clerk signup requires')
+      ? 'تحقق من بريدك الإلكتروني لإكمال إنشاء الحساب.'
+      : message.toLowerCase().includes('email verification')
+        ? 'رمز التحقق غير صحيح أو منتهي الصلاحية.'
     : getArabicErrorMessage(
         err,
         'حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.',
@@ -212,17 +347,26 @@ function CustomSelect({
 export default function RegisterScreen() {
   const router = useRouter();
   const { role } = useLocalSearchParams<{ role?: UserRole }>();
-  const { signIn } = useAuthActions();
+  const { isLoaded: clerkLoaded, signUp, setActive } = useSignUp();
+  const { startSSOFlow } = useSSO();
+  const googleRedirectUrl = makeRedirectUri({ path: 'sso-callback' });
+  const convexClient = useConvex();
   const { isAuthenticated, isLoading: authLoading } = useConvexAuth();
   const registerUser = useMutation(api.users.register);
   const wilayas = useQuery(api.locations.listWilayas, {});
+  const specialties = useQuery(api.specialties.list, {});
 
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const [roleReady, setRoleReady] = useState(false);
   const [pendingRegistration, setPendingRegistration] =
     useState<RegistrationPayload | null>(null);
+  const [verificationModalVisible, setVerificationModalVisible] =
+    useState(false);
+  const [verificationCode, setVerificationCode] = useState('');
+  const [verificationLoading, setVerificationLoading] = useState(false);
   const completingRegistrationRef = useRef(false);
 
   const {
@@ -236,6 +380,7 @@ export default function RegisterScreen() {
     resolver: zodResolver(fullSchema),
     defaultValues: {
       fullName: '',
+      phone: '',
       email: '',
       password: '',
       confirmPassword: '',
@@ -243,6 +388,8 @@ export default function RegisterScreen() {
       communeId: undefined as unknown as string,
       dateOfBirth: '',
       gender: 'male',
+      specialtyId: undefined as unknown as string,
+      orderRegistrationNumber: '',
     },
   });
 
@@ -267,6 +414,12 @@ export default function RegisterScreen() {
       nameAr: commune.nameAr,
     })) ?? [];
   const communesLoading = selectedWilayaId != null && communes === undefined;
+  const specialtyOptions: SelectOption[] =
+    specialties?.map((specialty) => ({
+      id: specialty._id,
+      nameAr: specialty.nameAr,
+    })) ?? [];
+  const specialtiesLoading = specialties === undefined;
 
   // Redirect to onboarding if role is missing or invalid
   useEffect(() => {
@@ -292,6 +445,7 @@ export default function RegisterScreen() {
   const handleNext = useCallback(async () => {
     const valid = await trigger([
       'fullName',
+      'phone',
       'email',
       'password',
       'confirmPassword',
@@ -301,6 +455,40 @@ export default function RegisterScreen() {
       setStep(2);
     }
   }, [trigger]);
+
+  const handleStartGoogleSignUp = useCallback(async () => {
+    setSubmitting(true);
+    setGoogleLoading(true);
+    setServerError(null);
+
+    try {
+      const {
+        createdSessionId,
+        setActive: activateOAuthSession,
+      } = await startSSOFlow({
+        strategy: 'oauth_google',
+        redirectUrl: googleRedirectUrl,
+      });
+      const activateSession = activateOAuthSession ?? setActive;
+
+      if (!createdSessionId || !activateSession) {
+        throw new Error('Google sign-up did not complete.');
+      }
+
+      await activateSession({ session: createdSessionId });
+      router.replace('/');
+    } catch (err: any) {
+      setServerError(getRegistrationErrorMessage(err));
+    } finally {
+      setSubmitting(false);
+      setGoogleLoading(false);
+    }
+  }, [
+    googleRedirectUrl,
+    router,
+    setActive,
+    startSSOFlow,
+  ]);
 
   useEffect(() => {
     if (
@@ -338,6 +526,23 @@ export default function RegisterScreen() {
     router,
   ]);
 
+  const completeClerkSignup = useCallback(
+    async (
+      createdSessionId: string,
+      registrationPayload: RegistrationPayload,
+      activateOAuthSession = setActive,
+    ) => {
+      if (!activateOAuthSession) {
+        throw new Error('Clerk session activation is not ready.');
+      }
+      await activateOAuthSession({ session: createdSessionId });
+      setVerificationModalVisible(false);
+      setVerificationCode('');
+      setPendingRegistration(registrationPayload);
+    },
+    [setActive],
+  );
+
   // Final submission
   const onSubmit = useCallback(
     async (data: FormData) => {
@@ -345,47 +550,133 @@ export default function RegisterScreen() {
       setServerError(null);
 
       try {
-        if (role === 'patient' && !data.dateOfBirth?.trim()) {
-          setServerError('يرجى إدخال تاريخ الميلاد');
-          setSubmitting(false);
-          return;
-        }
-        if (role === 'patient' && !data.gender) {
-          setServerError('يرجى اختيار الجنس');
+        const {
+          emailAuthIdentifier,
+          phoneAuthIdentifier,
+          registrationPayload,
+        } = buildRegistrationPayload(data, role);
+        const emailAccountExists = await convexClient.query(
+          api.users.isPasswordAccountRegistered,
+          { email: emailAuthIdentifier },
+        );
+        if (emailAccountExists) {
+          setServerError('البريد الإلكتروني مستخدم بالفعل');
           setSubmitting(false);
           return;
         }
 
-        const registrationPayload: RegistrationPayload = {
-          fullNameAr: data.fullName.trim(),
-          role: role ?? 'patient',
-          wilayaId: data.wilayaId as Id<'wilayas'>,
-          communeId:
-            role === 'patient'
-              ? (data.communeId as Id<'communes'>)
-              : undefined,
-          dateOfBirth: data.dateOfBirth,
-          gender: data.gender,
-        };
+        if (!clerkLoaded || !signUp) {
+          throw new Error('Clerk sign-up is not ready.');
+        }
 
-        const signInResult = await signIn('password', {
-          email: data.email,
+        const signUpAttempt = await signUp.create({
+          emailAddress: emailAuthIdentifier,
           password: data.password,
-          flow: 'signUp',
+          unsafeMetadata: {
+            role: registrationPayload.role,
+            phone: phoneAuthIdentifier,
+          },
         });
 
-        if (!signInResult.signingIn) {
-          throw new Error('Sign up did not complete.');
+        if (
+          signUpAttempt.status === 'complete' &&
+          signUpAttempt.createdSessionId
+        ) {
+          await completeClerkSignup(
+            signUpAttempt.createdSessionId,
+            registrationPayload,
+          );
+          return;
         }
 
-        setPendingRegistration(registrationPayload);
+        if (signUpAttempt.unverifiedFields.includes('email_address')) {
+          await signUp.prepareEmailAddressVerification({
+            strategy: 'email_code',
+          });
+          setPendingRegistration(registrationPayload);
+          setVerificationCode('');
+          setVerificationModalVisible(true);
+          Alert.alert(
+            'تم إرسال رمز التحقق',
+            'أدخل الرمز الذي وصل إلى بريدك الإلكتروني لإكمال إنشاء الحساب.',
+          );
+          return;
+        }
+
+        throw new Error(`Clerk signup requires: ${signUpAttempt.missingFields.join(', ')}`);
       } catch (err: any) {
         setServerError(getRegistrationErrorMessage(err));
         setSubmitting(false);
       }
     },
-    [role, signIn],
+    [clerkLoaded, completeClerkSignup, convexClient, role, signUp],
   );
+
+  const handleVerifyEmailCode = useCallback(async () => {
+    if (!verificationCode.trim()) {
+      setServerError('أدخل رمز التحقق الذي وصل إلى بريدك الإلكتروني');
+      return;
+    }
+    if (!signUp || !pendingRegistration) {
+      setServerError('انتهت جلسة إنشاء الحساب. أعد المحاولة.');
+      setVerificationModalVisible(false);
+      setSubmitting(false);
+      return;
+    }
+
+    setVerificationLoading(true);
+    setServerError(null);
+
+    try {
+      const verificationAttempt =
+        await signUp.attemptEmailAddressVerification({
+          code: verificationCode.trim(),
+        });
+
+      if (
+        verificationAttempt.status !== 'complete' ||
+        !verificationAttempt.createdSessionId
+      ) {
+        throw new Error('Email verification did not complete.');
+      }
+
+      await completeClerkSignup(
+        verificationAttempt.createdSessionId,
+        pendingRegistration,
+      );
+    } catch (err: any) {
+      setServerError(getRegistrationErrorMessage(err));
+      setSubmitting(false);
+    } finally {
+      setVerificationLoading(false);
+    }
+  }, [completeClerkSignup, pendingRegistration, signUp, verificationCode]);
+
+  const handleResendVerificationCode = useCallback(async () => {
+    if (!signUp) {
+      setServerError('انتهت جلسة إنشاء الحساب. أعد المحاولة.');
+      setVerificationModalVisible(false);
+      setSubmitting(false);
+      return;
+    }
+
+    setVerificationLoading(true);
+    setServerError(null);
+
+    try {
+      await signUp.prepareEmailAddressVerification({
+        strategy: 'email_code',
+      });
+      Alert.alert(
+        'تم إرسال رمز جديد',
+        'تحقق من بريدك الإلكتروني، ثم أدخل الرمز الجديد.',
+      );
+    } catch (err) {
+      setServerError(getRegistrationErrorMessage(err));
+    } finally {
+      setVerificationLoading(false);
+    }
+  }, [signUp]);
 
   // Don't render until role is validated
   if (!roleReady) {
@@ -493,6 +784,37 @@ export default function RegisterScreen() {
                 ) : null}
               </View>
 
+              {/* Phone */}
+              <View style={fieldStyles.wrapper}>
+                <Text style={fieldStyles.label}>رقم الهاتف</Text>
+                <Controller
+                  control={control}
+                  name="phone"
+                  render={({ field: { onChange, onBlur, value } }) => (
+                    <TextInput
+                      style={[
+                        fieldStyles.input,
+                        errors.phone ? fieldStyles.inputError : null,
+                      ]}
+                      placeholder="0555 12 34 56"
+                      placeholderTextColor={theme.colors.textSecondary}
+                      onBlur={onBlur}
+                      onChangeText={onChange}
+                      value={value}
+                      keyboardType="phone-pad"
+                      autoComplete="tel"
+                      textAlign={rtlValue('left', 'right')}
+                      returnKeyType="next"
+                    />
+                  )}
+                />
+                {errors.phone ? (
+                  <Text style={fieldStyles.errorText}>
+                    {errors.phone.message}
+                  </Text>
+                ) : null}
+              </View>
+
               {/* Email */}
               <View style={fieldStyles.wrapper}>
                 <Text style={fieldStyles.label}>البريد الإلكتروني</Text>
@@ -511,6 +833,7 @@ export default function RegisterScreen() {
                       onChangeText={onChange}
                       value={value}
                       keyboardType="email-address"
+                      autoComplete="email"
                       autoCapitalize="none"
                       autoCorrect={false}
                       textAlign={rtlValue('left', 'right')}
@@ -523,6 +846,37 @@ export default function RegisterScreen() {
                     {errors.email.message}
                   </Text>
                 ) : null}
+              </View>
+
+              <TouchableOpacity
+                style={[
+                  styles.googleButton,
+                  googleLoading ? styles.buttonDisabled : null,
+                ]}
+                onPress={handleStartGoogleSignUp}
+                activeOpacity={0.8}
+                disabled={submitting || googleLoading}
+                accessibilityRole="button"
+                accessibilityLabel="المتابعة باستخدام Google"
+              >
+                {googleLoading ? (
+                  <ActivityIndicator size="small" color={theme.colors.official} />
+                ) : (
+                  <>
+                    <View style={styles.googleMark}>
+                      <Text style={styles.googleMarkText}>G</Text>
+                    </View>
+                    <Text style={styles.googleButtonText}>
+                      المتابعة باستخدام Google
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+
+              <View style={styles.oauthDivider}>
+                <View style={styles.oauthDividerLine} />
+                <Text style={styles.oauthDividerText}>أو سجل بكلمة مرور</Text>
+                <View style={styles.oauthDividerLine} />
               </View>
 
               {/* Password */}
@@ -721,7 +1075,56 @@ export default function RegisterScreen() {
                     />
                   </View>
                 </>
-              ) : null}
+              ) : (
+                <>
+                  <View style={fieldStyles.wrapper}>
+                    <Text style={fieldStyles.label}>التخصص</Text>
+                    <Controller
+                      control={control}
+                      name="specialtyId"
+                      render={({ field: { onChange, value }, fieldState: { error } }) => (
+                        <CustomSelect
+                          placeholder={
+                            specialtiesLoading
+                              ? 'جاري تحميل التخصصات...'
+                              : 'اختر تخصصك'
+                          }
+                          value={value}
+                          options={specialtyOptions}
+                          onSelect={onChange}
+                          error={error?.message}
+                          disabled={specialtiesLoading}
+                          loading={specialtiesLoading}
+                          emptyMessage="لا توجد تخصصات متاحة"
+                        />
+                      )}
+                    />
+                  </View>
+
+                  <View style={fieldStyles.wrapper}>
+                    <Text style={fieldStyles.label}>رقم التسجيل في النقابة</Text>
+                    <Controller
+                      control={control}
+                      name="orderRegistrationNumber"
+                      render={({ field: { onChange, onBlur, value } }) => (
+                        <TextInput
+                          style={fieldStyles.input}
+                          placeholder="مثال: 2024-12345"
+                          placeholderTextColor={theme.colors.textSecondary}
+                          onBlur={onBlur}
+                          onChangeText={onChange}
+                          value={value}
+                          autoCapitalize="characters"
+                          textAlign={rtlValue('left', 'right')}
+                          returnKeyType="done"
+                        />
+                      )}
+                    />
+                  </View>
+                </>
+              )}
+
+              <View nativeID="clerk-captcha" style={styles.clerkCaptcha} />
 
               {/* Action buttons */}
               <View style={styles.buttonRow}>
@@ -729,30 +1132,30 @@ export default function RegisterScreen() {
                   style={styles.secondaryButton}
                   onPress={() => setStep(1)}
                   activeOpacity={0.8}
-                  disabled={submitting}
+                  disabled={submitting || googleLoading}
                 >
                   <Text style={styles.secondaryButtonText}>رجوع</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={[
-                    styles.primaryButton,
-                    styles.primaryButtonFlex,
-                    submitting ? styles.buttonDisabled : null,
-                  ]}
-                  onPress={handleSubmit(onSubmit)}
-                  activeOpacity={0.8}
-                  disabled={submitting}
-                >
-                  {submitting ? (
-                    <ActivityIndicator size="small" color={theme.colors.white} />
-                  ) : (
-                    <Text style={styles.primaryButtonText}>تسجيل</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
+                  <TouchableOpacity
+                   style={[
+                     styles.primaryButton,
+                     styles.primaryButtonFlex,
+                     submitting ? styles.buttonDisabled : null,
+                   ]}
+                   onPress={handleSubmit(onSubmit)}
+                   activeOpacity={0.8}
+                   disabled={submitting || googleLoading}
+                 >
+                   {submitting ? (
+                     <ActivityIndicator size="small" color={theme.colors.white} />
+                   ) : (
+                     <Text style={styles.primaryButtonText}>تسجيل</Text>
+                   )}
+                 </TouchableOpacity>
+               </View>
+             </View>
+           )}
 
           {/* ── Extra Links ────────────────────────────────────── */}
           <View style={styles.footer}>
@@ -762,6 +1165,86 @@ export default function RegisterScreen() {
             </TouchableOpacity>
           </View>
         </ScrollView>
+
+        <Modal
+          visible={verificationModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => {
+            if (!verificationLoading) {
+              setVerificationModalVisible(false);
+              setSubmitting(false);
+            }
+          }}
+        >
+          <View style={styles.verificationOverlay}>
+            <View style={styles.verificationModal}>
+              <Text style={styles.verificationTitle}>رمز التحقق</Text>
+              <Text style={styles.verificationSubtitle}>
+                أدخل الرمز الذي وصل إلى بريدك الإلكتروني لإكمال إنشاء الحساب
+              </Text>
+
+              {serverError ? (
+                <View style={styles.serverErrorBox}>
+                  <Text style={styles.serverErrorText}>{serverError}</Text>
+                </View>
+              ) : null}
+
+              <TextInput
+                style={fieldStyles.input}
+                value={verificationCode}
+                onChangeText={setVerificationCode}
+                placeholder="123456"
+                placeholderTextColor={theme.colors.textSecondary}
+                keyboardType="number-pad"
+                textAlign={rtlValue('left', 'right')}
+                editable={!verificationLoading}
+              />
+
+              <View style={styles.buttonRow}>
+                <TouchableOpacity
+                  style={styles.secondaryButton}
+                  onPress={() => {
+                    setVerificationModalVisible(false);
+                    setSubmitting(false);
+                  }}
+                  activeOpacity={0.8}
+                  disabled={verificationLoading}
+                >
+                  <Text style={styles.secondaryButtonText}>إلغاء</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.primaryButton,
+                    styles.primaryButtonFlex,
+                    verificationLoading ? styles.buttonDisabled : null,
+                  ]}
+                  onPress={handleVerifyEmailCode}
+                  activeOpacity={0.8}
+                  disabled={verificationLoading}
+                >
+                  {verificationLoading ? (
+                    <ActivityIndicator size="small" color={theme.colors.white} />
+                  ) : (
+                    <Text style={styles.primaryButtonText}>تأكيد</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity
+                style={styles.resendCodeButton}
+                onPress={handleResendVerificationCode}
+                activeOpacity={0.8}
+                disabled={verificationLoading}
+              >
+                <Text style={styles.resendCodeText}>
+                  لم يصلك الرمز؟ أرسل رمزاً جديداً
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -908,6 +1391,100 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: theme.spacing.md,
     marginTop: theme.spacing.sm,
+  },
+  oauthDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.md,
+    marginTop: theme.spacing.lg,
+  },
+  oauthDividerLine: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: theme.colors.borderStrong,
+  },
+  oauthDividerText: {
+    fontFamily: theme.typography.fontFamily.arabic,
+    fontSize: 13,
+    color: theme.colors.textSecondary,
+  },
+  googleButton: {
+    minHeight: 50,
+    backgroundColor: theme.colors.white,
+    borderWidth: 1,
+    borderColor: theme.colors.official,
+    borderRadius: theme.borderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row-reverse',
+    gap: theme.spacing.md,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
+  },
+  googleMark: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: theme.colors.borderStrong,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  googleMarkText: {
+    fontFamily: theme.typography.fontFamily.latinMedium,
+    fontSize: 14,
+    color: theme.colors.official,
+  },
+  googleButtonText: {
+    fontFamily: theme.typography.fontFamily.arabicBold,
+    fontSize: 16,
+    color: theme.colors.official,
+    textAlign: 'center',
+    writingDirection: 'rtl',
+  },
+  clerkCaptcha: {
+    minHeight: 1,
+  },
+  verificationOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: theme.spacing.xl,
+  },
+  verificationModal: {
+    width: '100%',
+    backgroundColor: theme.colors.background,
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.xl,
+  },
+  verificationTitle: {
+    fontFamily: theme.typography.fontFamily.arabicBold,
+    fontSize: 20,
+    color: theme.colors.textPrimary,
+    textAlign: 'center',
+    writingDirection: 'rtl',
+    marginBottom: theme.spacing.sm,
+  },
+  verificationSubtitle: {
+    fontFamily: theme.typography.fontFamily.arabic,
+    fontSize: 14,
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+    writingDirection: 'rtl',
+    marginBottom: theme.spacing.lg,
+  },
+  resendCodeButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: theme.spacing.lg,
+  },
+  resendCodeText: {
+    fontFamily: theme.typography.fontFamily.arabicBold,
+    fontSize: 14,
+    color: theme.colors.primary,
+    textAlign: 'center',
+    writingDirection: 'rtl',
   },
   genderRow: {
     flexDirection: 'row',

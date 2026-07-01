@@ -1,4 +1,5 @@
 import { ConvexReactClient, ConvexProvider, useQuery } from "convex/react";
+import { convexLogger } from "./convexLogger";
 
 const convexUrl = process.env.EXPO_PUBLIC_CONVEX_URL;
 
@@ -8,7 +9,9 @@ if (!convexUrl) {
   );
 }
 
-export const convex = new ConvexReactClient(convexUrl);
+export const convex = new ConvexReactClient(convexUrl, {
+  logger: convexLogger,
+});
 
 export { ConvexProvider, ConvexReactClient };
 

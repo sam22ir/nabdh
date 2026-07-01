@@ -1,55 +1,78 @@
 import { useEffect, useState } from 'react';
-import { Platform } from 'react-native';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts } from 'expo-font';
-import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {
-  ConvexAuthProvider,
-  type TokenStorage,
-} from '@convex-dev/auth/react';
+import { ClerkProvider, useAuth } from '@clerk/clerk-expo';
+import { tokenCache } from '@clerk/clerk-expo/token-cache';
+import { ConvexProviderWithClerk } from 'convex/react-clerk';
+import { useConvex, useConvexAuth } from 'convex/react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { I18nextProvider } from 'react-i18next';
 import i18n from '../src/lib/i18n';
 import { convex } from '../src/lib/convex';
 import ConvexErrorBoundary from '../src/components/ConvexErrorBoundary';
+import {
+  registerPushNotifications,
+  unregisterPushNotifications,
+} from '../src/lib/pushNotifications';
 
 // ---------------------------------------------------------------------------
 // Keep the splash screen visible while we load fonts and initialise services
 // ---------------------------------------------------------------------------
 void SplashScreen.preventAutoHideAsync();
 
-const authStorage: TokenStorage = {
-  getItem: (key) => {
-    if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
-      return localStorage.getItem(key);
-    }
-    return SecureStore.getItemAsync(key);
-  },
-  setItem: (key, value) => {
-    if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
-      localStorage.setItem(key, value);
-      return;
-    }
-    return SecureStore.setItemAsync(key, value);
-  },
-  removeItem: (key) => {
-    if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
-      localStorage.removeItem(key);
-      return;
-    }
-    return SecureStore.deleteItemAsync(key);
-  },
-};
+const clerkPublishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
+
+if (!clerkPublishableKey) {
+  throw new Error(
+    'EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY is not set. Add your Clerk publishable key to the app environment.',
+  );
+}
 
 function removeLegacyAuthStore() {
-  if (Platform.OS === 'web' && typeof localStorage !== 'undefined') {
+  if (typeof localStorage !== 'undefined') {
     localStorage.removeItem('auth-storage');
     return;
   }
 
   void AsyncStorage.removeItem('auth-storage');
+}
+
+function PushNotificationsRegistrar() {
+  const convexClient = useConvex();
+  const { isAuthenticated, isLoading } = useConvexAuth();
+
+  useEffect(() => {
+    if (isLoading || !isAuthenticated) return;
+
+    let active = true;
+    let token: string | null = null;
+
+    void registerPushNotifications({ convex: convexClient })
+      .then((registeredToken) => {
+        if (!registeredToken) return;
+        if (active) {
+          token = registeredToken;
+        } else {
+          void unregisterPushNotifications(convexClient, registeredToken).catch(
+            () => undefined,
+          );
+        }
+      })
+      .catch(() => {
+        // Push registration is best-effort; in-app notifications still work.
+      });
+
+    return () => {
+      active = false;
+      void unregisterPushNotifications(convexClient, token).catch(
+        () => undefined,
+      );
+    };
+  }, [convexClient, isAuthenticated, isLoading]);
+
+  return null;
 }
 
 export default function RootLayout() {
@@ -92,17 +115,20 @@ export default function RootLayout() {
 
   return (
     <I18nextProvider i18n={i18n}>
-      <ConvexAuthProvider client={convex} storage={authStorage}>
-        <ConvexErrorBoundary>
-          <SafeAreaProvider>
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="(auth)" />
-            <Stack.Screen name="(patient)" />
-            <Stack.Screen name="(doctor)" />
-          </Stack>
-          </SafeAreaProvider>
-        </ConvexErrorBoundary>
-      </ConvexAuthProvider>
+      <ClerkProvider publishableKey={clerkPublishableKey} tokenCache={tokenCache}>
+        <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
+          <ConvexErrorBoundary>
+            <SafeAreaProvider>
+              <PushNotificationsRegistrar />
+              <Stack screenOptions={{ headerShown: false }}>
+                <Stack.Screen name="(auth)" />
+                <Stack.Screen name="(patient)" />
+                <Stack.Screen name="(doctor)" />
+              </Stack>
+            </SafeAreaProvider>
+          </ConvexErrorBoundary>
+        </ConvexProviderWithClerk>
+      </ClerkProvider>
     </I18nextProvider>
   );
 }

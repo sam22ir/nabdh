@@ -1,7 +1,16 @@
 import { ConvexError, v } from "convex/values";
-import { query, mutation, internalMutation } from "./_generated/server";
-import { getAuthUserId } from "@convex-dev/auth/server";
-import { getAuthedUserId } from "./lib/auth";
+import {
+  query,
+  mutation,
+  internalMutation,
+  type QueryCtx,
+  type MutationCtx,
+} from "./_generated/server";
+import { getAuthedUserId, getOptionalAuthedUser } from "./lib/auth";
+import {
+  normalizeEmailForAuth,
+  normalizePhoneForAuth,
+} from "./lib/authIdentifiers";
 
 // ---------------------------------------------------------------------------
 // Shared return-shape helpers (used by both `me` and `getProfile`).
@@ -79,7 +88,7 @@ const doctorProfileFields = {
 /**
  * Helper: fetch the patient record for a given userId.
  */
-async function getPatientProfile(ctx: any, userId: string) {
+async function getPatientProfile(ctx: QueryCtx | MutationCtx, userId: string) {
   return await ctx.db
     .query("patients")
     .withIndex("by_userId", (q: any) => q.eq("userId", userId))
@@ -89,11 +98,30 @@ async function getPatientProfile(ctx: any, userId: string) {
 /**
  * Helper: fetch the doctor record for a given userId.
  */
-async function getDoctorProfile(ctx: any, userId: string) {
+async function getDoctorProfile(ctx: QueryCtx | MutationCtx, userId: string) {
   return await ctx.db
     .query("doctors")
     .withIndex("by_userId", (q: any) => q.eq("userId", userId))
     .first();
+}
+
+async function getUserByEmail(ctx: QueryCtx | MutationCtx, email: string) {
+  return await ctx.db
+    .query("users")
+    .withIndex("email", (q) => q.eq("email", email))
+    .first();
+}
+
+function emailBelongsToAnotherIdentity(
+  emailUser: Awaited<ReturnType<typeof getUserByEmail>>,
+  existingUserId: string | null,
+  tokenIdentifier: string,
+) {
+  return (
+    emailUser != null &&
+    emailUser._id !== existingUserId &&
+    emailUser.tokenIdentifier !== tokenIdentifier
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -117,11 +145,9 @@ export const me = query({
     }),
   ),
   handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return null;
-
-    const user = await ctx.db.get(userId);
+    const user = await getOptionalAuthedUser(ctx);
     if (!user) return null;
+    const userId = user._id;
 
     let profile: any = null;
     if (user.role === "patient") {
@@ -200,6 +226,77 @@ export const getProfile = query({
   },
 });
 
+export const isPasswordAccountRegistered = query({
+  args: { email: v.string() },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const email = normalizeEmailForAuth(args.email);
+    const user = await ctx.db
+      .query("users")
+      .withIndex("email", (q) => q.eq("email", email))
+      .first();
+
+    return user !== null;
+  },
+});
+
+export const getProfileCompletionContext = query({
+  args: {},
+  returns: v.object({
+    isAuthenticated: v.boolean(),
+    existingUser: v.union(v.null(), v.object(userFields)),
+    email: v.union(v.null(), v.string()),
+    name: v.union(v.null(), v.string()),
+    emailBelongsToAnotherUser: v.boolean(),
+  }),
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      return {
+        isAuthenticated: false,
+        existingUser: null,
+        email: null,
+        name: null,
+        emailBelongsToAnotherUser: false,
+      };
+    }
+
+    const existingUser = await getOptionalAuthedUser(ctx);
+    const email = identity.email
+      ? normalizeEmailForAuth(identity.email)
+      : null;
+    const emailUser = email ? await getUserByEmail(ctx, email) : null;
+
+    return {
+      isAuthenticated: true,
+      existingUser: existingUser
+        ? {
+            _id: existingUser._id,
+            _creationTime: existingUser._creationTime,
+            name: existingUser.name,
+            email: existingUser.email,
+            phone: existingUser.phone,
+            image: existingUser.image,
+            fullNameAr: existingUser.fullNameAr,
+            fullNameFr: existingUser.fullNameFr,
+            gender: existingUser.gender,
+            role: existingUser.role,
+            wilayaId: existingUser.wilayaId,
+            avatarUrl: existingUser.avatarUrl,
+            isActive: existingUser.isActive,
+          }
+        : null,
+      email,
+      name: identity.name ?? null,
+      emailBelongsToAnotherUser: emailBelongsToAnotherIdentity(
+        emailUser,
+        existingUser?._id ?? null,
+        identity.tokenIdentifier,
+      ),
+    };
+  },
+});
+
 // ---------------------------------------------------------------------------
 // Public mutations
 // ---------------------------------------------------------------------------
@@ -223,6 +320,8 @@ export const getProfile = query({
 export const register = mutation({
   args: {
     fullNameAr: v.string(),
+    phone: v.string(),
+    email: v.string(),
     role: v.union(v.literal("patient"), v.literal("doctor")),
     wilayaId: v.id("wilayas"),
 
@@ -237,7 +336,24 @@ export const register = mutation({
   },
   returns: v.id("users"),
   handler: async (ctx, args) => {
-    const userId = await getAuthedUserId(ctx);
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError("Not authenticated");
+    }
+
+    const phone = normalizePhoneForAuth(args.phone);
+    const email = normalizeEmailForAuth(args.email);
+    const existingUser = await getOptionalAuthedUser(ctx);
+    const emailUser = await getUserByEmail(ctx, email);
+    if (
+      emailBelongsToAnotherIdentity(
+        emailUser,
+        existingUser?._id ?? null,
+        identity.tokenIdentifier,
+      )
+    ) {
+      throw new ConvexError("Email already belongs to another account.");
+    }
 
     if (args.role === "patient") {
       if (!args.communeId || !args.dateOfBirth || !args.gender) {
@@ -245,17 +361,35 @@ export const register = mutation({
           "Patient profile required: commune, birth date, and gender are required.",
         );
       }
+    } else if (args.role === "doctor") {
+      if (!args.specialtyId || !args.orderRegistrationNumber) {
+        throw new ConvexError(
+          "Doctor profile required: specialty and registration number are required.",
+        );
+      }
     }
 
-    // ---------------------------------------------------------------
-    // 1. Patch the user document
-    // ---------------------------------------------------------------
-    await ctx.db.patch(userId, {
+    const userPatch = {
+      name: args.fullNameAr,
       fullNameAr: args.fullNameAr,
+      phone,
+      email,
+      tokenIdentifier: identity.tokenIdentifier,
       role: args.role,
       wilayaId: args.wilayaId,
       isActive: true,
-    });
+    };
+
+    // ---------------------------------------------------------------
+    // 1. Create or patch the user document.
+    // ---------------------------------------------------------------
+    const userId = existingUser
+      ? existingUser._id
+      : await ctx.db.insert("users", userPatch);
+
+    if (existingUser) {
+      await ctx.db.patch(userId, userPatch);
+    }
 
     // ---------------------------------------------------------------
     // 2. Check for conflicting profiles
@@ -279,34 +413,31 @@ export const register = mutation({
     }
 
     // ---------------------------------------------------------------
-    // 3. Create role-specific record when the role-specific profile data
-    //    has already been collected. Basic signup can complete first.
+    // 3. Create role-specific record.
     // ---------------------------------------------------------------
     if (args.role === "doctor") {
-      if (args.specialtyId && args.orderRegistrationNumber) {
-        const existingDoctor = await ctx.db
-          .query("doctors")
-          .withIndex("by_userId", (q: any) => q.eq("userId", userId))
-          .first();
+      const existingDoctor = await ctx.db
+        .query("doctors")
+        .withIndex("by_userId", (q: any) => q.eq("userId", userId))
+        .first();
 
-        if (!existingDoctor) {
-          await ctx.db.insert("doctors", {
-            userId,
-            specialtyId: args.specialtyId,
-            subSpecialties: [],
-            bioAr: "",
-            bioFr: "",
-            yearsOfExperience: 0,
-            languages: [],
-            orderRegistrationNumber: args.orderRegistrationNumber,
-            isVerified: false,
-            isProfileComplete: false,
-            consultationFee: 0,
-            followUpFee: 0,
-            avgRating: 0,
-            totalReviews: 0,
-          });
-        }
+      if (!existingDoctor) {
+        await ctx.db.insert("doctors", {
+          userId,
+          specialtyId: args.specialtyId!,
+          subSpecialties: [],
+          bioAr: "",
+          bioFr: "",
+          yearsOfExperience: 0,
+          languages: ["ar"],
+          orderRegistrationNumber: args.orderRegistrationNumber!,
+          isVerified: false,
+          isProfileComplete: true,
+          consultationFee: 0,
+          followUpFee: 0,
+          avgRating: 0,
+          totalReviews: 0,
+        });
       }
     } else {
       const existingPatient = await ctx.db
@@ -360,6 +491,84 @@ export const updateProfile = mutation({
     }
 
     return userId;
+  },
+});
+
+/**
+ * Creates the missing core doctor profile for an authenticated doctor user.
+ * This repairs accounts that completed auth but do not yet have a `doctors`
+ * row, which doctor profile, schedule, and appointment workflows require.
+ */
+export const completeDoctorProfile = mutation({
+  args: {
+    specialtyId: v.id("specialties"),
+    orderRegistrationNumber: v.string(),
+  },
+  returns: v.id("doctors"),
+  handler: async (ctx, args) => {
+    const userId = await getAuthedUserId(ctx);
+    const user = await ctx.db.get(userId);
+    if (!user) {
+      throw new ConvexError("User not found.");
+    }
+    if (user.role && user.role !== "doctor") {
+      throw new ConvexError("Only doctor accounts can complete a doctor profile.");
+    }
+
+    const existingPatient = await ctx.db
+      .query("patients")
+      .withIndex("by_userId", (q: any) => q.eq("userId", userId))
+      .first();
+    if (existingPatient) {
+      throw new ConvexError("Patient accounts cannot create doctor profiles.");
+    }
+
+    const specialty = await ctx.db.get(args.specialtyId);
+    if (!specialty) {
+      throw new ConvexError("Specialty not found.");
+    }
+
+    const registrationNumber = args.orderRegistrationNumber.trim();
+    if (registrationNumber.length < 3) {
+      throw new ConvexError("Doctor registration number is required.");
+    }
+
+    const existingDoctor = await ctx.db
+      .query("doctors")
+      .withIndex("by_userId", (q: any) => q.eq("userId", userId))
+      .first();
+    if (existingDoctor) {
+      if (!existingDoctor.isProfileComplete) {
+        await ctx.db.patch(existingDoctor._id, {
+          isProfileComplete: true,
+          orderRegistrationNumber: registrationNumber,
+          specialtyId: args.specialtyId,
+        });
+      }
+      return existingDoctor._id;
+    }
+
+    await ctx.db.patch(userId, {
+      role: "doctor",
+      isActive: true,
+    });
+
+    return await ctx.db.insert("doctors", {
+      userId,
+      specialtyId: args.specialtyId,
+      subSpecialties: [],
+      bioAr: "",
+      bioFr: "",
+      yearsOfExperience: 0,
+      languages: ["ar"],
+      orderRegistrationNumber: registrationNumber,
+      isVerified: false,
+      isProfileComplete: true,
+      consultationFee: 0,
+      followUpFee: 0,
+      avgRating: 0,
+      totalReviews: 0,
+    });
   },
 });
 

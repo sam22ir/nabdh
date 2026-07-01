@@ -44,7 +44,15 @@
             "assets/fonts/Inter-Medium.ttf"
           ]
         }
-      ]
+      ],
+      [
+        "expo-notifications",
+        {
+          "defaultChannel": "default"
+        }
+      ],
+      "expo-router",
+      "expo-web-browser"
     ]
   }
 }

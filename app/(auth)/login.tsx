@@ -1,20 +1,22 @@
 import { useState, useCallback } from 'react';
 import {
   Alert,
+  Modal,
   View,
   Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { makeRedirectUri } from 'expo-auth-session';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useAuthActions } from '@convex-dev/auth/react';
+import { useSSO, useSignIn } from '@clerk/clerk-expo';
 import { theme } from '../../src/lib/theme';
+import { normalizeEmailForAuth } from '../../src/lib/authIdentifiers';
 
 // ---------------------------------------------------------------------------
 // Component
@@ -22,16 +24,19 @@ import { theme } from '../../src/lib/theme';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { signIn } = useAuthActions();
+  const { isLoaded, signIn, setActive } = useSignIn();
+  const { startSSOFlow } = useSSO();
+  const googleRedirectUrl = makeRedirectUri({ path: 'sso-callback' });
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [resetLoading, setResetLoading] = useState(false);
-  const [resetModalVisible, setResetModalVisible] = useState(false);
   const [resetCode, setResetCode] = useState('');
-  const [resetPassword, setResetPassword] = useState('');
-  const [resetPasswordConfirm, setResetPasswordConfirm] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [resetModalVisible, setResetModalVisible] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleLogin = useCallback(async () => {
@@ -44,11 +49,22 @@ export default function LoginScreen() {
     setError(null);
 
     try {
-      await signIn('password', {
-        email: email.trim().toLowerCase(),
+      if (!isLoaded || !signIn) {
+        throw new Error('Clerk sign-in is not ready.');
+      }
+      const emailAuthIdentifier = normalizeEmailForAuth(email);
+      const signInAttempt = await signIn.create({
+        identifier: emailAuthIdentifier,
         password,
-        flow: 'signIn',
+        strategy: 'password',
       });
+      if (
+        signInAttempt.status !== 'complete' ||
+        !signInAttempt.createdSessionId
+      ) {
+        throw new Error('Sign in did not complete.');
+      }
+      await setActive({ session: signInAttempt.createdSessionId });
       router.replace('/');
     } catch (err) {
       setError(
@@ -57,12 +73,38 @@ export default function LoginScreen() {
     } finally {
       setLoading(false);
     }
-  }, [email, password, router, signIn]);
+  }, [email, isLoaded, password, router, setActive, signIn]);
+
+  const handleGoogleSignIn = useCallback(async () => {
+    setGoogleLoading(true);
+    setError(null);
+
+    try {
+      const {
+        createdSessionId,
+        setActive: activateOAuthSession,
+      } = await startSSOFlow({
+        strategy: 'oauth_google',
+        redirectUrl: googleRedirectUrl,
+      });
+      const activateSession = activateOAuthSession ?? setActive;
+
+      if (!createdSessionId || !activateSession) {
+        throw new Error('Google sign-in did not complete.');
+      }
+
+      await activateSession({ session: createdSessionId });
+      router.replace('/');
+    } catch (err) {
+      setError('تعذر تسجيل الدخول باستخدام Google. حاول مرة أخرى.');
+    } finally {
+      setGoogleLoading(false);
+    }
+  }, [googleRedirectUrl, router, setActive, startSSOFlow]);
 
   const handleForgotPassword = useCallback(async () => {
-    const normalizedEmail = email.trim().toLowerCase();
-    if (!normalizedEmail) {
-      setError('أدخل بريدك الإلكتروني أولاً لإعادة تعيين كلمة المرور');
+    if (!email.trim()) {
+      setError('أدخل بريدك الإلكتروني أولا لإرسال رمز إعادة التعيين');
       return;
     }
 
@@ -70,62 +112,76 @@ export default function LoginScreen() {
     setError(null);
 
     try {
-      await signIn('password', {
-        email: normalizedEmail,
-        flow: 'reset',
+      if (!isLoaded || !signIn) {
+        throw new Error('Clerk sign-in is not ready.');
+      }
+      const emailAuthIdentifier = normalizeEmailForAuth(email);
+      await signIn.create({
+        identifier: emailAuthIdentifier,
+        strategy: 'reset_password_email_code',
       });
+      setResetCode('');
+      setNewPassword('');
+      setConfirmNewPassword('');
       setResetModalVisible(true);
       Alert.alert(
-        'تم إرسال رمز التحقق',
-        'أدخل رمز التحقق وكلمة المرور الجديدة لإكمال العملية.',
+        'تم إرسال رمز إعادة التعيين',
+        'تحقق من بريدك الإلكتروني وأدخل الرمز لتغيير كلمة المرور.',
       );
-    } catch {
-      Alert.alert(
-        'تعذر إرسال رمز التحقق',
-        'تأكد من البريد الإلكتروني ثم حاول مرة أخرى.',
-      );
+    } catch (err) {
+      setError('تعذر إرسال رمز إعادة التعيين لهذا البريد الإلكتروني');
     } finally {
       setResetLoading(false);
     }
-  }, [email, signIn]);
+  }, [email, isLoaded, signIn]);
 
   const handleSubmitPasswordReset = useCallback(async () => {
-    const normalizedEmail = email.trim().toLowerCase();
-    if (!resetCode.trim()) {
-      Alert.alert('رمز التحقق مطلوب', 'أدخل الرمز المرسل إلى بريدك الإلكتروني.');
+    if (!resetCode.trim() || !newPassword.trim()) {
+      setError('أدخل رمز إعادة التعيين وكلمة المرور الجديدة');
       return;
     }
-    if (resetPassword.length < 8) {
-      Alert.alert('كلمة المرور قصيرة', 'يجب أن تتكون كلمة المرور من 8 أحرف على الأقل.');
-      return;
-    }
-    if (resetPassword !== resetPasswordConfirm) {
-      Alert.alert('كلمتا المرور غير متطابقتين', 'أعد إدخال كلمة المرور الجديدة.');
+    if (newPassword !== confirmNewPassword) {
+      setError('كلمتا المرور غير متطابقتين');
       return;
     }
 
     setResetLoading(true);
+    setError(null);
+
     try {
-      await signIn('password', {
-        email: normalizedEmail,
+      if (!isLoaded || !signIn) {
+        throw new Error('Clerk sign-in is not ready.');
+      }
+      const resetAttempt = await signIn.attemptFirstFactor({
+        strategy: 'reset_password_email_code',
         code: resetCode.trim(),
-        newPassword: resetPassword,
-        flow: 'reset-verification',
+        password: newPassword,
       });
+      if (
+        resetAttempt.status === 'complete' &&
+        resetAttempt.createdSessionId
+      ) {
+        await setActive({ session: resetAttempt.createdSessionId });
+      }
       setResetModalVisible(false);
       setResetCode('');
-      setResetPassword('');
-      setResetPasswordConfirm('');
-      Alert.alert('تم تغيير كلمة المرور', 'يمكنك الآن تسجيل الدخول بكلمة المرور الجديدة.');
-    } catch {
-      Alert.alert(
-        'تعذر تغيير كلمة المرور',
-        'تحقق من الرمز وكلمة المرور الجديدة ثم حاول مرة أخرى.',
-      );
+      setNewPassword('');
+      setConfirmNewPassword('');
+      router.replace('/');
+    } catch (err) {
+      setError('رمز إعادة التعيين غير صحيح أو منتهي الصلاحية');
     } finally {
       setResetLoading(false);
     }
-  }, [email, resetCode, resetPassword, resetPasswordConfirm, signIn]);
+  }, [
+    confirmNewPassword,
+    isLoaded,
+    newPassword,
+    resetCode,
+    router,
+    setActive,
+    signIn,
+  ]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -136,7 +192,7 @@ export default function LoginScreen() {
         <View style={styles.container}>
           {/* ─── Header ──────────────────────────────────────────────────── */}
           <View style={styles.header}>
-            <Text style={styles.title}>نبد</Text>
+            <Text style={styles.title}>نبض</Text>
             <Text style={styles.subtitle}>تسجيل الدخول إلى حسابك</Text>
           </View>
 
@@ -154,8 +210,9 @@ export default function LoginScreen() {
               keyboardType="email-address"
               autoCapitalize="none"
               autoComplete="email"
+              autoCorrect={false}
               textAlign="right"
-              editable={!loading}
+              editable={!loading && !googleLoading}
             />
 
             <Text style={styles.label}>كلمة المرور</Text>
@@ -167,14 +224,14 @@ export default function LoginScreen() {
               placeholderTextColor={theme.colors.textSecondary}
               secureTextEntry
               textAlign="right"
-              editable={!loading}
+              editable={!loading && !googleLoading}
             />
 
             <TouchableOpacity
               style={styles.forgotPassword}
               activeOpacity={0.7}
               onPress={handleForgotPassword}
-              disabled={loading || resetLoading}
+              disabled={loading || resetLoading || googleLoading}
             >
               <Text style={styles.forgotPasswordText}>
                 نسيت كلمة المرور؟
@@ -185,12 +242,43 @@ export default function LoginScreen() {
               style={[styles.button, loading && styles.buttonDisabled]}
               activeOpacity={0.85}
               onPress={handleLogin}
-              disabled={loading}
+              disabled={loading || googleLoading}
             >
               {loading ? (
                 <ActivityIndicator color={theme.colors.white} />
               ) : (
                 <Text style={styles.buttonText}>تسجيل الدخول</Text>
+              )}
+            </TouchableOpacity>
+
+            <View style={styles.oauthDivider}>
+              <View style={styles.oauthDividerLine} />
+              <Text style={styles.oauthDividerText}>أو</Text>
+              <View style={styles.oauthDividerLine} />
+            </View>
+
+            <TouchableOpacity
+              style={[
+                styles.googleButton,
+                googleLoading && styles.buttonDisabled,
+              ]}
+              activeOpacity={0.85}
+              onPress={handleGoogleSignIn}
+              disabled={loading || resetLoading || googleLoading}
+              accessibilityRole="button"
+              accessibilityLabel="المتابعة باستخدام Google"
+            >
+              {googleLoading ? (
+                <ActivityIndicator color={theme.colors.official} />
+              ) : (
+                <>
+                  <View style={styles.googleMark}>
+                    <Text style={styles.googleMarkText}>G</Text>
+                  </View>
+                  <Text style={styles.googleButtonText}>
+                    المتابعة باستخدام Google
+                  </Text>
+                </>
               )}
             </TouchableOpacity>
           </View>
@@ -213,20 +301,22 @@ export default function LoginScreen() {
             onRequestClose={() => setResetModalVisible(false)}
           >
             <View style={styles.modalOverlay}>
-              <View style={styles.resetModal}>
-                <Text style={styles.resetTitle}>إعادة تعيين كلمة المرور</Text>
-                <Text style={styles.resetDescription}>
-                  أدخل رمز التحقق وكلمة المرور الجديدة.
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>إعادة تعيين كلمة المرور</Text>
+                <Text style={styles.modalSubtitle}>
+                  أدخل الرمز الذي وصل إلى بريدك الإلكتروني وكلمة المرور الجديدة
                 </Text>
 
-                <Text style={styles.label}>رمز التحقق</Text>
+                {error && <Text style={styles.errorText}>{error}</Text>}
+
+                <Text style={styles.label}>رمز إعادة التعيين</Text>
                 <TextInput
                   style={styles.input}
                   value={resetCode}
                   onChangeText={setResetCode}
-                  placeholder="رمز التحقق"
+                  placeholder="123456"
                   placeholderTextColor={theme.colors.textSecondary}
-                  autoCapitalize="none"
+                  keyboardType="number-pad"
                   textAlign="right"
                   editable={!resetLoading}
                 />
@@ -234,21 +324,21 @@ export default function LoginScreen() {
                 <Text style={styles.label}>كلمة المرور الجديدة</Text>
                 <TextInput
                   style={styles.input}
-                  value={resetPassword}
-                  onChangeText={setResetPassword}
-                  placeholder="••••••••"
+                  value={newPassword}
+                  onChangeText={setNewPassword}
+                  placeholder="كلمة المرور الجديدة"
                   placeholderTextColor={theme.colors.textSecondary}
                   secureTextEntry
                   textAlign="right"
                   editable={!resetLoading}
                 />
 
-                <Text style={styles.label}>تأكيد كلمة المرور</Text>
+                <Text style={styles.label}>تأكيد كلمة المرور الجديدة</Text>
                 <TextInput
                   style={styles.input}
-                  value={resetPasswordConfirm}
-                  onChangeText={setResetPasswordConfirm}
-                  placeholder="••••••••"
+                  value={confirmNewPassword}
+                  onChangeText={setConfirmNewPassword}
+                  placeholder="أعد كتابة كلمة المرور"
                   placeholderTextColor={theme.colors.textSecondary}
                   secureTextEntry
                   textAlign="right"
@@ -257,29 +347,33 @@ export default function LoginScreen() {
 
                 <View style={styles.modalActions}>
                   <TouchableOpacity
-                    style={[styles.modalButton, styles.modalButtonSecondary]}
-                    activeOpacity={0.8}
+                    style={styles.modalSecondaryButton}
                     onPress={() => setResetModalVisible(false)}
                     disabled={resetLoading}
+                    activeOpacity={0.8}
                   >
-                    <Text style={styles.modalButtonSecondaryText}>إلغاء</Text>
+                    <Text style={styles.modalSecondaryButtonText}>إلغاء</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.modalButton, styles.modalButtonPrimary]}
-                    activeOpacity={0.8}
+                    style={[
+                      styles.modalPrimaryButton,
+                      resetLoading && styles.buttonDisabled,
+                    ]}
                     onPress={handleSubmitPasswordReset}
                     disabled={resetLoading}
+                    activeOpacity={0.8}
                   >
                     {resetLoading ? (
                       <ActivityIndicator color={theme.colors.white} />
                     ) : (
-                      <Text style={styles.modalButtonPrimaryText}>تأكيد</Text>
+                      <Text style={styles.buttonText}>تغيير كلمة المرور</Text>
                     )}
                   </TouchableOpacity>
                 </View>
               </View>
             </View>
           </Modal>
+
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -316,7 +410,7 @@ const styles = StyleSheet.create({
   title: {
     fontFamily: theme.typography.fontFamily.arabicBold,
     fontSize: 32,
-    color: theme.colors.primary,
+    color: theme.colors.official,
     marginBottom: theme.spacing.sm,
   },
 
@@ -373,14 +467,14 @@ const styles = StyleSheet.create({
   forgotPasswordText: {
     fontFamily: theme.typography.fontFamily.arabic,
     fontSize: 14,
-    color: theme.colors.primary,
+    color: theme.colors.official,
     writingDirection: 'rtl',
   },
 
   button: {
     width: '100%',
     height: 50,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: theme.colors.official,
     borderRadius: theme.borderRadius.md,
     alignItems: 'center',
     justifyContent: 'center',
@@ -394,6 +488,61 @@ const styles = StyleSheet.create({
     fontFamily: theme.typography.fontFamily.arabicBold,
     fontSize: 18,
     color: theme.colors.white,
+  },
+
+  oauthDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.md,
+    marginVertical: theme.spacing.lg,
+  },
+
+  oauthDividerLine: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: theme.colors.borderStrong,
+  },
+
+  oauthDividerText: {
+    fontFamily: theme.typography.fontFamily.arabic,
+    fontSize: 13,
+    color: theme.colors.textSecondary,
+  },
+
+  googleButton: {
+    width: '100%',
+    height: 50,
+    backgroundColor: theme.colors.white,
+    borderWidth: 1,
+    borderColor: theme.colors.official,
+    borderRadius: theme.borderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row-reverse',
+    gap: theme.spacing.md,
+  },
+
+  googleMark: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: theme.colors.borderStrong,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  googleMarkText: {
+    fontFamily: theme.typography.fontFamily.latinMedium,
+    fontSize: 14,
+    color: theme.colors.official,
+  },
+
+  googleButtonText: {
+    fontFamily: theme.typography.fontFamily.arabicBold,
+    fontSize: 16,
+    color: theme.colors.official,
+    writingDirection: 'rtl',
   },
 
   // ─── Footer ────────────────────────────────────────────────────────────
@@ -416,41 +565,41 @@ const styles = StyleSheet.create({
   footerLink: {
     fontFamily: theme.typography.fontFamily.arabicBold,
     fontSize: 14,
-    color: theme.colors.primary,
+    color: theme.colors.official,
     writingDirection: 'rtl',
   },
 
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.45)',
     alignItems: 'center',
-    paddingHorizontal: theme.spacing['2xl'],
+    justifyContent: 'center',
+    paddingHorizontal: theme.spacing.xl,
   },
 
-  resetModal: {
+  modalContent: {
     width: '100%',
-    maxWidth: 420,
-    backgroundColor: theme.colors.white,
+    backgroundColor: theme.colors.background,
     borderRadius: theme.borderRadius.lg,
-    padding: theme.spacing['2xl'],
+    padding: theme.spacing.xl,
   },
 
-  resetTitle: {
+  modalTitle: {
     fontFamily: theme.typography.fontFamily.arabicBold,
     fontSize: 20,
     color: theme.colors.textPrimary,
-    textAlign: 'right',
+    textAlign: 'center',
+    writingDirection: 'rtl',
     marginBottom: theme.spacing.sm,
   },
 
-  resetDescription: {
+  modalSubtitle: {
     fontFamily: theme.typography.fontFamily.arabic,
     fontSize: 14,
     color: theme.colors.textSecondary,
-    textAlign: 'right',
-    marginBottom: theme.spacing.lg,
+    textAlign: 'center',
     writingDirection: 'rtl',
+    marginBottom: theme.spacing.lg,
   },
 
   modalActions: {
@@ -459,33 +608,30 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.sm,
   },
 
-  modalButton: {
-    flex: 1,
-    minHeight: 46,
+  modalPrimaryButton: {
+    flex: 1.4,
+    height: 50,
+    backgroundColor: theme.colors.official,
     borderRadius: theme.borderRadius.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
 
-  modalButtonSecondary: {
-    backgroundColor: theme.colors.background,
-    borderWidth: 1,
+  modalSecondaryButton: {
+    flex: 1,
+    height: 50,
+    backgroundColor: theme.colors.white,
     borderColor: theme.colors.border,
+    borderWidth: 1,
+    borderRadius: theme.borderRadius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
-  modalButtonPrimary: {
-    backgroundColor: theme.colors.primary,
-  },
-
-  modalButtonSecondaryText: {
+  modalSecondaryButtonText: {
     fontFamily: theme.typography.fontFamily.arabicBold,
-    fontSize: 15,
+    fontSize: 16,
     color: theme.colors.textPrimary,
   },
 
-  modalButtonPrimaryText: {
-    fontFamily: theme.typography.fontFamily.arabicBold,
-    fontSize: 15,
-    color: theme.colors.white,
-  },
 });

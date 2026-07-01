@@ -11,23 +11,29 @@ export default function IndexScreen() {
   const navigationReady = navigationState?.key != null;
 
   const me = useQuery(api.users.me, {});
+  const completionContext = useQuery(api.users.getProfileCompletionContext, {});
 
   const redirectBasedOnAuth = useCallback(() => {
-    if (me === undefined) return; // still loading
+    if (me === undefined || completionContext === undefined) return;
+
+    if (completionContext.isAuthenticated && !me) {
+      router.replace('/complete-profile');
+      return;
+    }
 
     if (!me) {
       router.replace('/(auth)/onboarding');
       return;
     }
 
-    if (me.role === 'patient') {
+    if (me.role === 'patient' && me.profile) {
       router.replace('/(patient)');
-    } else if (me.role === 'doctor') {
+    } else if (me.role === 'doctor' && me.profile) {
       router.replace('/(doctor)/dashboard');
     } else {
-      router.replace('/(auth)/onboarding');
+      router.replace('/complete-profile');
     }
-  }, [me, router]);
+  }, [completionContext, me, router]);
 
   useEffect(() => {
     if (navigationReady) {

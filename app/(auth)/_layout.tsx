@@ -9,17 +9,16 @@ export default function AuthLayout() {
   const pathname = usePathname();
   const me = useQuery(api.users.me, {});
   const patientRegistrationComplete = me?.role === "patient" && me.profile;
-  const needsPatientProfile = me?.role === "patient" && !me.profile;
 
   useEffect(() => {
     if (patientRegistrationComplete) {
       router.replace("/(patient)");
-    } else if (me?.role === "doctor") {
+    } else if (me?.role === "doctor" && me.profile) {
       router.replace("/(doctor)/dashboard");
-    } else if (me && !needsPatientProfile && pathname !== "/onboarding") {
-      router.replace("/(auth)/onboarding");
+    } else if (me && pathname !== "/onboarding") {
+      router.replace("/complete-profile");
     }
-  }, [me, needsPatientProfile, patientRegistrationComplete, pathname, router]);
+  }, [me, patientRegistrationComplete, pathname, router]);
 
   if (me === undefined) {
     return (
@@ -29,7 +28,7 @@ export default function AuthLayout() {
     );
   }
 
-  if (patientRegistrationComplete || me?.role === "doctor") {
+  if (patientRegistrationComplete || (me?.role === "doctor" && me.profile)) {
     return null;
   }
 
