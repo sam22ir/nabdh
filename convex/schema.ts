@@ -98,6 +98,7 @@ export default defineSchema({
   })
     .index("by_userId", ["userId"])
     .index("by_specialty", ["specialtyId"])
+    .index("by_isProfileComplete", ["isProfileComplete"])
     .index("by_verified", ["isVerified"]),
 
   // -------------------------------------------------
@@ -312,7 +313,25 @@ export default defineSchema({
     platform: v.union(v.literal("android"), v.literal("ios")),
   })
     .index("by_userId", ["userId"])
+    .index("by_token", ["token"])
     .index("by_userId_and_token", ["userId", "token"]),
+
+  // -------------------------------------------------
+  // doctorSettings — account-level operational
+  // preferences for doctor notification and booking
+  // policy controls.
+  // -------------------------------------------------
+  doctorSettings: defineTable({
+    doctorId: v.id("doctors"),
+    userId: v.id("users"),
+    newBookingAlerts: v.boolean(),
+    cancellationAlerts: v.boolean(),
+    dailySummary: v.boolean(),
+    minCancelHours: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_doctorId", ["doctorId"])
+    .index("by_userId", ["userId"]),
 
   // -------------------------------------------------
   // patientFavorites — bookmarking of doctors by

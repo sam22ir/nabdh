@@ -11,8 +11,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useAuthActions } from '@convex-dev/auth/react';
+import { useClerk } from '@clerk/clerk-expo';
+import { useMutation, useQuery } from 'convex/react';
 
+import { api } from '@/convex/_generated/api';
 import {
   DoctorHeader,
   DoctorSection,
@@ -272,29 +274,38 @@ const HoursPicker: React.FC<HoursPickerProps> = ({
 
 export default function DoctorSettingsScreen() {
   const router = useRouter();
-  const { signOut } = useAuthActions();
+  const { signOut } = useClerk();
   const clearUser = useAuthStore((s) => s.clearUser);
+  const serverSettings = useQuery(api.doctorSettings.getMy, {});
+  const updateServerSettings = useMutation(api.doctorSettings.updateMy);
 
-  const newBookingAlerts = useDoctorSettingsStore((s) => s.newBookingAlerts);
-  const setNewBookingAlerts = useDoctorSettingsStore(
+  const localNewBookingAlerts = useDoctorSettingsStore((s) => s.newBookingAlerts);
+  const setLocalNewBookingAlerts = useDoctorSettingsStore(
     (s) => s.setNewBookingAlerts,
   );
-  const cancellationAlerts = useDoctorSettingsStore(
+  const localCancellationAlerts = useDoctorSettingsStore(
     (s) => s.cancellationAlerts,
   );
-  const setCancellationAlerts = useDoctorSettingsStore(
+  const setLocalCancellationAlerts = useDoctorSettingsStore(
     (s) => s.setCancellationAlerts,
   );
-  const dailySummary = useDoctorSettingsStore((s) => s.dailySummary);
-  const setDailySummary = useDoctorSettingsStore((s) => s.setDailySummary);
-  const minCancelHours = useDoctorSettingsStore((s) => s.minCancelHours);
-  const setMinCancelHours = useDoctorSettingsStore(
+  const localDailySummary = useDoctorSettingsStore((s) => s.dailySummary);
+  const setLocalDailySummary = useDoctorSettingsStore((s) => s.setDailySummary);
+  const localMinCancelHours = useDoctorSettingsStore((s) => s.minCancelHours);
+  const setLocalMinCancelHours = useDoctorSettingsStore(
     (s) => s.setMinCancelHours,
   );
 
   const [privacyModalVisible, setPrivacyModalVisible] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [activePanel, setActivePanel] = useState<SettingsPanel>('alerts');
+  const settingsLoading = serverSettings === undefined;
+  const newBookingAlerts =
+    serverSettings?.newBookingAlerts ?? localNewBookingAlerts;
+  const cancellationAlerts =
+    serverSettings?.cancellationAlerts ?? localCancellationAlerts;
+  const dailySummary = serverSettings?.dailySummary ?? localDailySummary;
+  const minCancelHours = serverSettings?.minCancelHours ?? localMinCancelHours;
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
@@ -319,6 +330,38 @@ export default function DoctorSettingsScreen() {
       return opt?.label ?? `${hours} ساعة`;
     },
     [],
+  );
+
+  const updateSetting = useCallback(
+    async (
+      patch: Partial<{
+        newBookingAlerts: boolean;
+        cancellationAlerts: boolean;
+        dailySummary: boolean;
+        minCancelHours: number;
+      }>,
+    ) => {
+      if (patch.newBookingAlerts !== undefined) {
+        setLocalNewBookingAlerts(patch.newBookingAlerts);
+      }
+      if (patch.cancellationAlerts !== undefined) {
+        setLocalCancellationAlerts(patch.cancellationAlerts);
+      }
+      if (patch.dailySummary !== undefined) {
+        setLocalDailySummary(patch.dailySummary);
+      }
+      if (patch.minCancelHours !== undefined) {
+        setLocalMinCancelHours(patch.minCancelHours);
+      }
+      await updateServerSettings(patch);
+    },
+    [
+      setLocalCancellationAlerts,
+      setLocalDailySummary,
+      setLocalMinCancelHours,
+      setLocalNewBookingAlerts,
+      updateServerSettings,
+    ],
   );
 
   // ==========================================================================
@@ -356,19 +399,34 @@ export default function DoctorSettingsScreen() {
               <ToggleRow
                 label="تنبيهات الحجوزات الجديدة"
                 value={newBookingAlerts}
-                onValueChange={setNewBookingAlerts}
+                onValueChange={(value) =>
+                  void updateSetting({ newBookingAlerts: value }).catch(
+                    () => undefined,
+                  )
+                }
+                disabled={settingsLoading}
               />
               <View style={styles.rowDivider} />
               <ToggleRow
                 label="تنبيهات الإلغاء"
                 value={cancellationAlerts}
-                onValueChange={setCancellationAlerts}
+                onValueChange={(value) =>
+                  void updateSetting({ cancellationAlerts: value }).catch(
+                    () => undefined,
+                  )
+                }
+                disabled={settingsLoading}
               />
               <View style={styles.rowDivider} />
               <ToggleRow
                 label="الملخص اليومي"
                 value={dailySummary}
-                onValueChange={setDailySummary}
+                onValueChange={(value) =>
+                  void updateSetting({ dailySummary: value }).catch(
+                    () => undefined,
+                  )
+                }
+                disabled={settingsLoading}
               />
             </View>
           </DoctorSection>
@@ -393,7 +451,11 @@ export default function DoctorSettingsScreen() {
               <HoursPicker
                 options={MIN_HOURS_OPTIONS}
                 selectedValue={minCancelHours}
-                onSelect={setMinCancelHours}
+                onSelect={(value) =>
+                  void updateSetting({ minCancelHours: value }).catch(
+                    () => undefined,
+                  )
+                }
               />
             </View>
           </DoctorSection>
@@ -434,7 +496,7 @@ export default function DoctorSettingsScreen() {
       >
         <View style={styles.modalBody}>
           <Text style={styles.modalText}>
-            يستخدم نبد بيانات الطبيب والعيادات والمواعيد لتشغيل خدمات الحجز
+            يستخدم نبض بيانات الطبيب والعيادات والمواعيد لتشغيل خدمات الحجز
             والمتابعة فقط. لا تظهر بياناتك المهنية إلا في حدود المعلومات التي
             اخترت نشرها للمرضى، ويمكنك تحديث إعداداتك أو تسجيل الخروج في أي وقت.
           </Text>
