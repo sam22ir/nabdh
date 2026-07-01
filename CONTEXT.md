@@ -17,8 +17,12 @@ A person who uses the app to find doctors and book appointments. Authenticated v
 _Avoid_: user, client, customer
 
 **Doctor** (الطبيب):
-A private-practice physician with a verified profile. Manages their schedule, confirms appointments, and responds to reviews. Authenticated via email + password. Must pass admin verification (manual check of نقابة registration number) before their profile is visible.
+A private-practice physician with a completed profile. Manages their schedule, confirms appointments, and responds to reviews. Authenticated via email + password. Manual verification of the نقابة registration number is a trust badge, not the public visibility gate.
 _Avoid_: provider, practitioner, clinician
+
+**Public Doctor Visibility**:
+A Doctor is publicly discoverable, viewable, and bookable when their profile is complete. Legacy doctor rows with a real registration number (`orderRegistrationNumber.trim().length >= 3`) remain public for compatibility even if `isProfileComplete` is false. `isVerified` means the app team manually checked credentials; it must not hide an otherwise complete Doctor from patient discovery.
+_Avoid_: using `isVerified` as the discovery or booking gate
 
 **Clinic Admin** (مدير العيادة):
 Manages appointments and schedules for multiple doctors at a single medical center. Future role — not in MVP.
