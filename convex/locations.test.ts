@@ -83,12 +83,27 @@ describe("locations seed", () => {
           .collect(),
       ]);
 
-      return { profiles, bookings, favorites };
+      const futureConfirmedBookings = bookings.filter(
+        (booking) =>
+          booking.status === "confirmed" &&
+          booking.appointmentDate > "2026-06-14",
+      );
+
+      return { profiles, bookings, favorites, futureConfirmedBookings };
     });
 
     expect(seededPatient?.profiles.length).toBeGreaterThan(0);
     expect(seededPatient?.bookings.length).toBeGreaterThan(0);
     expect(seededPatient?.favorites.length).toBeGreaterThan(0);
+    expect(seededPatient?.futureConfirmedBookings.length).toBeGreaterThan(0);
+
+    for (const booking of seededPatient!.futureConfirmedBookings) {
+      const slots = await t.query(api.bookings.getAvailableSlots, {
+        clinicId: booking.clinicId,
+        date: booking.appointmentDate,
+      });
+      expect(slots.length, booking.appointmentDate).toBeGreaterThan(0);
+    }
 
     await t.mutation(internal.seed.seed, {});
 

@@ -13,8 +13,9 @@ function authCtx(overrides: { identity?: unknown; foundUser?: unknown } = {}) {
     "identity" in overrides
       ? overrides.identity
       : {
-          subject: `${userId}|session_123`,
-          tokenIdentifier: "password:renamed@example.test",
+          subject: "user_clerk123",
+          tokenIdentifier: "https://clerk.example.test|user_clerk123",
+          email: "patient@example.test",
         };
   const foundUser = overrides.foundUser ?? user;
 
@@ -24,21 +25,31 @@ function authCtx(overrides: { identity?: unknown; foundUser?: unknown } = {}) {
     },
     db: {
       get: vi.fn(async (id: unknown) => (id === userId ? foundUser : null)),
-      query: vi.fn(() => {
-        throw new Error("tokenIdentifier lookup should not be used for Convex Auth users");
+      query: vi.fn((table: string) => {
+        if (table !== "users") {
+          throw new Error(`Unexpected table ${table}`);
+        }
+        return {
+          withIndex: vi.fn((_indexName: string, buildQuery: (q: unknown) => unknown) => {
+            const q = { eq: vi.fn(() => q) };
+            buildQuery(q);
+            return {
+              unique: vi.fn(async () => foundUser),
+            };
+          }),
+        };
       }),
     },
   };
 }
 
-describe("Convex auth helpers", () => {
-  test("resolve the current Convex Auth user id from the authenticated subject", async () => {
+describe("Clerk auth helpers", () => {
+  test("resolve the current app user id from Clerk tokenIdentifier", async () => {
     const ctx = authCtx();
 
     await expect(getAuthedUserId(ctx as never)).resolves.toBe(userId);
 
-    expect(ctx.db.get).toHaveBeenCalledWith(userId);
-    expect(ctx.db.query).not.toHaveBeenCalled();
+    expect(ctx.db.query).toHaveBeenCalledWith("users");
   });
 
   test("return the current user document and role without tokenIdentifier lookup", async () => {

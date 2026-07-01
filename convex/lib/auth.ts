@@ -1,5 +1,4 @@
 import { ConvexError } from "convex/values";
-import { getAuthUserId } from "@convex-dev/auth/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx, MutationCtx } from "../_generated/server";
 
@@ -9,24 +8,58 @@ import type { QueryCtx, MutationCtx } from "../_generated/server";
  */
 type AuthCtx = QueryCtx | MutationCtx;
 
+async function getUserByTokenIdentifier(
+  ctx: AuthCtx,
+  tokenIdentifier: string,
+): Promise<Doc<"users"> | null> {
+  return await ctx.db
+    .query("users")
+    .withIndex("tokenIdentifier", (q) =>
+      q.eq("tokenIdentifier", tokenIdentifier),
+    )
+    .unique();
+}
+
+async function getLegacySubjectUser(
+  ctx: AuthCtx,
+  subject: string,
+): Promise<Doc<"users"> | null> {
+  const userId = subject.split("|")[0] as Id<"users">;
+  if (!userId) return null;
+  return await ctx.db.get(userId);
+}
+
+export async function getOptionalAuthedUser(
+  ctx: AuthCtx,
+): Promise<Doc<"users"> | null> {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) return null;
+
+  const user = await getUserByTokenIdentifier(ctx, identity.tokenIdentifier);
+  if (user) return user;
+
+  return await getLegacySubjectUser(ctx, identity.subject);
+}
+
 /**
  * Returns the authenticated user's document _id.
  *
- * Uses Convex Auth's user id mapping, then verifies that the app-level user
- * document still exists.
+ * Uses the identity tokenIdentifier as the canonical app-user mapping. The
+ * subject fallback keeps existing Convex Auth development rows usable during
+ * the Clerk migration.
  */
 export async function getAuthedUserId(ctx: AuthCtx): Promise<Id<"users">> {
-  const userId = await getAuthUserId(ctx);
-  if (!userId) {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) {
     throw new ConvexError("Not authenticated");
   }
 
-  const user = await ctx.db.get(userId);
+  const user = await getOptionalAuthedUser(ctx);
   if (!user) {
     throw new ConvexError("User not found");
   }
 
-  return userId;
+  return user._id;
 }
 
 /**
@@ -36,12 +69,12 @@ export async function getAuthedUserId(ctx: AuthCtx): Promise<Id<"users">> {
  * instead of just the _id.
  */
 export async function getAuthedUser(ctx: AuthCtx): Promise<Doc<"users">> {
-  const userId = await getAuthUserId(ctx);
-  if (!userId) {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) {
     throw new ConvexError("Not authenticated");
   }
 
-  const user = await ctx.db.get(userId);
+  const user = await getOptionalAuthedUser(ctx);
   if (!user) {
     throw new ConvexError("User not found");
   }
@@ -86,9 +119,6 @@ export async function requireRole(
 export async function getUserRole(
   ctx: AuthCtx,
 ): Promise<string | undefined> {
-  const userId = await getAuthUserId(ctx);
-  if (!userId) return undefined;
-
-  const user = await ctx.db.get(userId);
+  const user = await getOptionalAuthedUser(ctx);
   return user?.role;
 }

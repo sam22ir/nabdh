@@ -940,7 +940,7 @@ export const seed = internalMutation({
       patientId,
       doctorId: aminaDoctorId,
       clinicId: aminaMainClinicId,
-      appointmentDate: "2099-01-05",
+      appointmentDate: "2099-01-04",
       appointmentTime: "09:00",
       appointmentDuration: 30,
       visitType: "first",
@@ -954,7 +954,7 @@ export const seed = internalMutation({
       doctorId: karimDoctorId,
       clinicId: karimClinicId,
       profileId: childProfileId,
-      appointmentDate: "2099-01-06",
+      appointmentDate: "2099-01-05",
       appointmentTime: "10:30",
       appointmentDuration: 30,
       visitType: "consultation",
@@ -995,11 +995,11 @@ export const seed = internalMutation({
       userId: patientUserId,
       type: "appointment_reminder",
       title: "تذكير بالموعد",
-      body: "لديك موعد مؤكد يوم 2099-01-05 على الساعة 09:00.",
+      body: "لديك موعد مؤكد يوم 2099-01-04 على الساعة 09:00.",
       data: {
         doctorId: aminaDoctorId,
         clinicId: aminaMainClinicId,
-        appointmentDate: "2099-01-05",
+        appointmentDate: "2099-01-04",
       },
       isRead: false,
     });
@@ -1011,7 +1011,7 @@ export const seed = internalMutation({
       data: {
         patientId,
         clinicId: aminaMainClinicId,
-        appointmentDate: "2099-01-05",
+        appointmentDate: "2099-01-04",
       },
       isRead: true,
     });

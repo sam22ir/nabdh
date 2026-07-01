@@ -1,9 +1,11 @@
 import { v, ConvexError } from "convex/values";
 import { query, mutation, internalMutation } from "./_generated/server";
 import { paginationOptsValidator } from "convex/server";
-import { getAuthUserId } from "@convex-dev/auth/server";
-import { getAuthedUserId, requireRole } from "./lib/auth";
-import type { Id } from "./_generated/dataModel";
+import { getAuthedUserId, getOptionalAuthedUser, requireRole } from "./lib/auth";
+import { isPublicDoctorProfile } from "./lib/doctorVisibility";
+import type { Doc, Id } from "./_generated/dataModel";
+
+const PUBLIC_DOCTOR_SCAN_LIMIT = 500;
 
 // ---------------------------------------------------------------------------
 // Shared validator fragments
@@ -39,6 +41,14 @@ const specialtyInfoValidator = v.object({
   nameFr: v.string(),
 });
 
+const wilayaInfoValidator = v.union(
+  v.object({
+    nameAr: v.string(),
+    nameFr: v.string(),
+  }),
+  v.null(),
+);
+
 const userDetailValidator = v.object({
   fullNameAr: v.union(v.string(), v.null()),
   phone: v.union(v.string(), v.null()),
@@ -65,6 +75,7 @@ const doctorCardValidator = v.object({
   ...doctorFields,
   user: userProfileValidator,
   specialty: specialtyInfoValidator,
+  wilaya: wilayaInfoValidator,
   isAvailableToday: v.boolean(),
 });
 
@@ -94,13 +105,14 @@ const toggleFavoriteResultValidator = v.object({
 async function enrichDoctorPage(
   ctx: any,
   page: any[],
+  options: { preferredWilayaId?: Id<"wilayas"> } = {},
 ): Promise<any[]> {
   return await Promise.all(
     page.map(async (doc) => {
-      const [user, specialty, isAvailableToday] = await Promise.all([
+      const [user, specialty, clinicSummary] = await Promise.all([
         ctx.db.get(doc.userId),
         ctx.db.get(doc.specialtyId),
-        doctorHasActiveScheduleToday(ctx, doc._id),
+        getDoctorClinicSummary(ctx, doc._id, options.preferredWilayaId),
       ]);
       return {
         ...doc,
@@ -113,21 +125,34 @@ async function enrichDoctorPage(
           nameAr: specialty?.nameAr ?? "",
           nameFr: specialty?.nameFr ?? "",
         },
-        isAvailableToday,
+        wilaya: clinicSummary.wilaya,
+        isAvailableToday: clinicSummary.isAvailableToday,
       };
     }),
   );
 }
 
-async function doctorHasActiveScheduleToday(ctx: any, doctorId: Id<"doctors">) {
+async function getDoctorClinicSummary(
+  ctx: any,
+  doctorId: Id<"doctors">,
+  preferredWilayaId?: Id<"wilayas">,
+) {
   const today = new Date().getDay();
   const clinics = await ctx.db
     .query("clinics")
     .withIndex("by_doctorId", (q: any) => q.eq("doctorId", doctorId))
     .collect();
 
-  for (const clinic of clinics) {
-    if (!clinic.isActive) continue;
+  const activeClinics = clinics.filter((clinic: any) => clinic.isActive);
+  const displayClinic =
+    (preferredWilayaId
+      ? activeClinics.find((clinic: any) => clinic.wilayaId === preferredWilayaId)
+      : null) ??
+    activeClinics[0] ??
+    null;
+
+  let isAvailableToday = false;
+  for (const clinic of activeClinics) {
     const schedules = await ctx.db
       .query("schedules")
       .withIndex("by_clinicId_and_dayOfWeek", (q: any) =>
@@ -135,11 +160,54 @@ async function doctorHasActiveScheduleToday(ctx: any, doctorId: Id<"doctors">) {
       )
       .collect();
     if (schedules.some((schedule: any) => schedule.isActive)) {
-      return true;
+      isAvailableToday = true;
+      break;
     }
   }
 
-  return false;
+  const wilaya = displayClinic ? await ctx.db.get(displayClinic.wilayaId) : null;
+
+  return {
+    isAvailableToday,
+    wilaya: wilaya
+      ? {
+          nameAr: wilaya.nameAr,
+          nameFr: wilaya.nameFr,
+        }
+      : null,
+  };
+}
+
+async function doctorHasActiveScheduleToday(ctx: any, doctorId: Id<"doctors">) {
+  return (await getDoctorClinicSummary(ctx, doctorId)).isAvailableToday;
+}
+
+async function loadPublicDoctors(ctx: any): Promise<Doc<"doctors">[]> {
+  const [completedDoctors, legacyDoctors] = await Promise.all([
+    ctx.db
+      .query("doctors")
+      .withIndex("by_isProfileComplete", (q: any) =>
+        q.eq("isProfileComplete", true),
+      )
+      .order("desc")
+      .take(PUBLIC_DOCTOR_SCAN_LIMIT),
+    ctx.db
+      .query("doctors")
+      .withIndex("by_isProfileComplete", (q: any) =>
+        q.eq("isProfileComplete", false),
+      )
+      .order("desc")
+      .take(PUBLIC_DOCTOR_SCAN_LIMIT),
+  ]);
+
+  const doctorsById = new Map<Id<"doctors">, Doc<"doctors">>();
+  for (const doctor of [...completedDoctors, ...legacyDoctors]) {
+    if (isPublicDoctorProfile(doctor)) {
+      doctorsById.set(doctor._id, doctor);
+    }
+  }
+
+  return [...doctorsById.values()];
 }
 
 async function applyDoctorFilters(
@@ -214,7 +282,7 @@ async function applyDoctorFilters(
 // ---------------------------------------------------------------------------
 
 /**
- * Paginated listing of verified doctors sorted by avgRating descending.
+ * Paginated listing of completed doctor profiles sorted by avgRating descending.
  *
  * Optional filters:
  *   specialtyId  — only doctors of the given specialty (index-level)
@@ -225,10 +293,10 @@ async function applyDoctorFilters(
  *   language     — case-insensitive match on the doctor's languages array
  *   availableToday — only doctors with an active clinic schedule today
  *
- * Because no compound index on (isVerified, avgRating) exists yet, all
- * verified doctors are collected in memory, sorted, and paginated manually.
- * Safe for tens of thousands of records.  For larger datasets add a
- * `by_verified_and_rating` index.
+ * `isVerified` is a credential badge, not a visibility gate. Legacy rows from
+ * the old completion bug are also public when their registration number is
+ * already present. For larger datasets, add a compound ranking/search field
+ * instead of increasing PUBLIC_DOCTOR_SCAN_LIMIT.
  */
 export const listPublic = query({
   args: {
@@ -241,10 +309,7 @@ export const listPublic = query({
   },
   returns: paginatedResponseValidator,
   handler: async (ctx, args) => {
-    const allDoctors = await ctx.db
-      .query("doctors")
-      .withIndex("by_verified", (q) => q.eq("isVerified", true))
-      .collect();
+    const allDoctors = await loadPublicDoctors(ctx);
 
     const filtered = await applyDoctorFilters(ctx, allDoctors, args);
 
@@ -263,14 +328,16 @@ export const listPublic = query({
     const nextCursor = String(start + numItems);
     const isDone = start + numItems >= filtered.length;
 
-    const enriched = await enrichDoctorPage(ctx, page);
+    const enriched = await enrichDoctorPage(ctx, page, {
+      preferredWilayaId: args.wilayaId,
+    });
 
     return { page: enriched, continueCursor: nextCursor, isDone };
   },
 });
 
 /**
- * Searches verified doctors by name and specialty.
+ * Searches completed doctor profiles by name and specialty.
  *
  * Uses `searchIndex` on the `specialties` table (nameAr / nameFr) to find
  * matching specialties, then returns doctors belonging to those specialties.
@@ -321,12 +388,9 @@ export const search = query({
     for (const s of specsAr) matchingSpecIds.add(s._id);
 
     // -----------------------------------------------------------------------
-    // Step 2 — load all verified doctors
+    // Step 2 — load all completed public doctor profiles
     // -----------------------------------------------------------------------
-    const allDoctors = await ctx.db
-      .query("doctors")
-      .withIndex("by_verified", (q) => q.eq("isVerified", true))
-      .collect();
+    const allDoctors = await loadPublicDoctors(ctx);
 
     // -----------------------------------------------------------------------
     // Step 3 — filter by matching specialty
@@ -387,7 +451,9 @@ export const search = query({
     const nextCursor = String(start + numItems);
     const isDone = start + numItems >= matched.length;
 
-    const enriched = await enrichDoctorPage(ctx, page);
+    const enriched = await enrichDoctorPage(ctx, page, {
+      preferredWilayaId: args.wilayaId,
+    });
 
     return { page: enriched, continueCursor: nextCursor, isDone };
   },
@@ -403,6 +469,7 @@ export const getById = query({
   handler: async (ctx, args) => {
     const doctor = await ctx.db.get(args.doctorId);
     if (!doctor) return null;
+    if (!isPublicDoctorProfile(doctor)) return null;
 
     const [user, specialty, clinics] = await Promise.all([
       ctx.db.get(doctor.userId),
@@ -502,23 +569,25 @@ export const getFavorites = query({
       favorites.map(async (fav) => {
         const doctor = await ctx.db.get(fav.doctorId);
         if (!doctor) return null;
-        const [docUser, specialty] = await Promise.all([
+        const [docUser, specialty, clinicSummary] = await Promise.all([
           ctx.db.get(doctor.userId),
           ctx.db.get(doctor.specialtyId),
+          getDoctorClinicSummary(ctx, doctor._id),
         ]);
         return {
           ...doctor,
           user: {
-          fullNameAr: docUser?.fullNameAr ?? null,
-          phone: docUser?.phone ?? null,
-          gender: docUser?.gender ?? null,
-        },
-        specialty: {
-          nameAr: specialty?.nameAr ?? "",
-          nameFr: specialty?.nameFr ?? "",
-        },
-        isAvailableToday: await doctorHasActiveScheduleToday(ctx, doctor._id),
-      };
+            fullNameAr: docUser?.fullNameAr ?? null,
+            phone: docUser?.phone ?? null,
+            gender: docUser?.gender ?? null,
+          },
+          specialty: {
+            nameAr: specialty?.nameAr ?? "",
+            nameFr: specialty?.nameFr ?? "",
+          },
+          wilaya: clinicSummary.wilaya,
+          isAvailableToday: clinicSummary.isAvailableToday,
+        };
       }),
     );
 
@@ -536,10 +605,7 @@ export const isFavorite = query({
   args: { doctorId: v.id("doctors") },
   returns: v.boolean(),
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return false;
-
-    const user = await ctx.db.get(userId);
+    const user = await getOptionalAuthedUser(ctx);
     if (user?.role !== "patient") return false;
 
     const patient = await ctx.db
@@ -640,6 +706,16 @@ export const updateProfile = mutation({
     }
     if (args.followUpFee !== undefined) {
       doctorPatch.followUpFee = args.followUpFee;
+    }
+    const nextSpecialtyId = args.specialtyId ?? doctor.specialtyId;
+    const nextRegistrationNumber =
+      args.orderRegistrationNumber ?? doctor.orderRegistrationNumber;
+    if (
+      !doctor.isProfileComplete &&
+      nextSpecialtyId &&
+      nextRegistrationNumber.trim().length >= 3
+    ) {
+      doctorPatch.isProfileComplete = true;
     }
 
     if (Object.keys(userPatch).length > 0) {
