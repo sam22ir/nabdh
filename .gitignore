@@ -39,6 +39,9 @@ playwright-report/
 # local agent/runtime files
 .agents/
 .claude/
+.codex/
+.superpowers/
+graphify-out/
 supabase/.temp/
 
 # typescript
