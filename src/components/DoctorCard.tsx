@@ -6,6 +6,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Badge, Panel, TrustRow } from '@/components/ui';
 import { theme } from '../lib/theme';
 import { rtlTextAlign } from '../lib/rtl';
 
@@ -84,67 +85,68 @@ const DoctorCard: React.FC<DoctorCardProps> = ({
       accessibilityRole="button"
       accessibilityLabel={`${doctor.fullNameAr}، ${doctor.specialty.nameAr}`}
     >
-      {/* Top row: Avatar placeholder + name/specialty + verification */}
-      <View style={styles.topRow}>
-        {/* Avatar placeholder */}
-        <View style={styles.avatar}>
-          <Ionicons name="person" size={24} color={theme.colors.textSecondary} />
+      <Panel style={styles.panel}>
+        {/* Top row: Avatar placeholder + name/specialty + verification */}
+        <View style={styles.topRow}>
+          {/* Avatar placeholder */}
+          <View style={styles.avatar}>
+            <Ionicons
+              name="person"
+              size={24}
+              color={theme.colors.official}
+            />
+          </View>
+
+          {/* Info */}
+          <View style={styles.info}>
+            <View style={styles.nameRow}>
+              <Text style={styles.name} numberOfLines={1}>
+                {doctor.fullNameAr}
+              </Text>
+              <Badge
+                label={doctor.isVerified ? 'موثق' : 'غير موثق'}
+                tone={doctor.isVerified ? 'success' : 'warning'}
+                icon={
+                  doctor.isVerified
+                    ? 'shield-checkmark-outline'
+                    : 'alert-circle-outline'
+                }
+              />
+            </View>
+            <Text style={styles.specialty} numberOfLines={1}>
+              {doctor.specialty.nameAr}
+            </Text>
+
+            {/* Rating */}
+            <View style={styles.ratingRow}>
+              {renderStars()}
+              <Text style={styles.ratingText}>
+                {doctor.avgRating.toFixed(1)}
+              </Text>
+              <Text style={styles.reviewCount}>
+                ({doctor.totalReviews})
+              </Text>
+            </View>
+          </View>
         </View>
 
-        {/* Info */}
-        <View style={styles.info}>
-          <Text style={styles.name} numberOfLines={1}>
-            {doctor.fullNameAr}
-          </Text>
-          <Text style={styles.specialty} numberOfLines={1}>
-            {doctor.specialty.nameAr}
-          </Text>
-
-          {/* Rating */}
-          <View style={styles.ratingRow}>
-            {renderStars()}
-            <Text style={styles.ratingText}>
-              {doctor.avgRating.toFixed(1)}
-            </Text>
-            <Text style={styles.reviewCount}>
-              ({doctor.totalReviews})
-            </Text>
-          </View>
-        </View>
-
-        {/* Verification badge */}
-        {doctor.isVerified ? (
-          <View style={styles.verifiedBadge}>
-            <Ionicons name="shield-checkmark" size={18} color={theme.colors.success} />
-          </View>
-        ) : (
-          <View style={styles.unverifiedBadge}>
-            <Ionicons name="warning" size={14} color={theme.colors.warning} />
-            <Text style={styles.unverifiedText}>غير موثق</Text>
-          </View>
-        )}
-      </View>
-
-      {/* Bottom row: Wilaya + availability */}
-      <View style={styles.bottomRow}>
-        <View style={styles.wilayaContainer}>
-          <Ionicons
-            name="location-outline"
-            size={14}
-            color={theme.colors.textSecondary}
+        {/* Bottom row: Wilaya + availability */}
+        <View style={styles.bottomRow}>
+          <TrustRow
+            icon="location-outline"
+            label="الولاية"
+            value={doctor.wilaya.nameAr || 'غير محددة'}
           />
-          <Text style={styles.wilayaText} numberOfLines={1}>
-            {doctor.wilaya.nameAr}
-          </Text>
-        </View>
 
-        {isAvailableToday && (
-          <View style={styles.availableBadge}>
-            <Ionicons name="checkmark-circle" size={14} color={theme.colors.white} />
-            <Text style={styles.availableText}>متاح اليوم</Text>
-          </View>
-        )}
-      </View>
+          {isAvailableToday && (
+            <Badge
+              label="متاح اليوم"
+              tone="success"
+              icon="checkmark-circle-outline"
+            />
+          )}
+        </View>
+      </Panel>
     </Pressable>
   );
 };
@@ -153,15 +155,14 @@ const DoctorCard: React.FC<DoctorCardProps> = ({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: theme.colors.white,
-    borderRadius: theme.borderRadius.lg,
-    padding: theme.spacing.lg,
     marginHorizontal: theme.spacing.lg,
     marginVertical: theme.spacing.xs,
-    ...theme.shadows.md,
   },
   cardPressed: {
     opacity: 0.92,
+  },
+  panel: {
+    gap: theme.spacing.md,
   },
   topRow: {
     flexDirection: 'row',
@@ -171,15 +172,25 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: theme.borderRadius.md,
-    backgroundColor: theme.colors.secondary,
+    backgroundColor: theme.colors.surfaceMuted,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: theme.spacing.md,
   },
   info: {
     flex: 1,
+    minWidth: 0,
+  },
+  nameRow: {
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
   },
   name: {
+    flex: 1,
     fontFamily: theme.typography.fontFamily.arabicBold,
     fontSize: 16,
     color: theme.colors.textPrimary,
@@ -188,7 +199,7 @@ const styles = StyleSheet.create({
   specialty: {
     fontFamily: theme.typography.fontFamily.arabic,
     fontSize: 13,
-    color: theme.colors.textSecondary,
+    color: theme.colors.primary,
     marginTop: theme.spacing.xs,
     textAlign: rtlTextAlign(),
   },
@@ -216,60 +227,14 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     marginLeft: theme.spacing.xs,
   },
-  verifiedBadge: {
-    marginLeft: theme.spacing.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 32,
-    height: 32,
-  },
-  unverifiedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFF8E1',
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: theme.spacing.xs,
-    borderRadius: theme.borderRadius.sm,
-    marginLeft: theme.spacing.sm,
-  },
-  unverifiedText: {
-    fontFamily: theme.typography.fontFamily.arabic,
-    fontSize: 11,
-    color: theme.colors.warning,
-    marginLeft: theme.spacing.xs,
-  },
   bottomRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: theme.spacing.md,
     paddingTop: theme.spacing.sm,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: theme.colors.border,
-  },
-  wilayaContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  wilayaText: {
-    fontFamily: theme.typography.fontFamily.arabic,
-    fontSize: 12,
-    color: theme.colors.textSecondary,
-    marginLeft: theme.spacing.xs,
-  },
-  availableBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.success,
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: theme.spacing.xs,
-    borderRadius: theme.borderRadius.sm,
-  },
-  availableText: {
-    fontFamily: theme.typography.fontFamily.arabic,
-    fontSize: 11,
-    color: theme.colors.white,
-    marginLeft: theme.spacing.xs,
+    gap: theme.spacing.md,
   },
 });
 

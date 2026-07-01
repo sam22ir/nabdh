@@ -6,7 +6,6 @@
 
 import React, { useCallback } from 'react';
 import {
-  ActivityIndicator,
   FlatList,
   ListRenderItemInfo,
   Pressable,
@@ -24,6 +23,7 @@ import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import DoctorCard, { DoctorCardData } from '@/components/DoctorCard';
 import EmptyState from '@/components/EmptyState';
+import { AppHeader, Badge, LoadingState } from '@/components/ui';
 import { theme } from '@/lib/theme';
 import { rtlTextAlign } from '@/lib/rtl';
 import type { Id } from '@/convex/_generated/dataModel';
@@ -187,10 +187,13 @@ export default function FavoritesScreen() {
   if (isLoading) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
-          <Text style={styles.loadingText}>جاري تحميل المفضلة...</Text>
-        </View>
+        <AppHeader
+          eyebrow="اختياراتك"
+          title="المفضلة"
+          subtitle="الأطباء الذين حفظتهم للوصول السريع عند الحجز."
+          icon="heart-outline"
+        />
+        <LoadingState label="جاري تحميل المفضلة..." />
       </SafeAreaView>
     );
   }
@@ -228,16 +231,23 @@ export default function FavoritesScreen() {
   // ── Main render ─────────────────────────────────────────────────────────
   return (
     <SafeAreaView style={styles.safeArea}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>المفضلة</Text>
-        {favDoctors.length > 0 && (
-          <Text style={styles.headerCount}>
-            {favDoctors.length}{' '}
-            {favDoctors.length === 1 ? 'طبيب' : 'أطباء'}
-          </Text>
-        )}
-      </View>
+      <AppHeader
+        eyebrow="اختياراتك"
+        title="المفضلة"
+        subtitle="الأطباء الذين حفظتهم يظهرون هنا لتعود إليهم عند الحاجة."
+        icon="heart-outline"
+        action={
+          favDoctors.length > 0 ? (
+            <Badge
+              label={`${favDoctors.length} ${
+                favDoctors.length === 1 ? 'طبيب' : 'أطباء'
+              }`}
+              tone="info"
+              icon="heart-outline"
+            />
+          ) : undefined
+        }
+      />
 
       {/* Results list or empty state */}
       {favDoctors.length > 0 ? (
@@ -263,7 +273,7 @@ export default function FavoritesScreen() {
       ) : (
         <View style={styles.emptyWrapper}>
           <EmptyState
-            icon="💔"
+            icon="heart-outline"
             title="لم تقم بإضافة أطباء للمفضلة بعد"
             subtitle="ابحث عن الأطباء وأضفهم إلى مفضلتك للوصول السريع"
             action={{
@@ -286,21 +296,12 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: theme.colors.background,
-    writingDirection: 'rtl',
   },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: theme.spacing['3xl'],
-  },
-
-  // ── Loading ─────────────────────────────────────────────────────────────────
-  loadingText: {
-    fontFamily: theme.typography.fontFamily.arabic,
-    fontSize: 14,
-    color: theme.colors.textSecondary,
-    marginTop: theme.spacing.md,
   },
 
   // ── Error ───────────────────────────────────────────────────────────────────
@@ -333,27 +334,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: theme.colors.white,
     marginLeft: theme.spacing.sm,
-  },
-
-  // ── Header ──────────────────────────────────────────────────────────────────
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.lg,
-  },
-  headerTitle: {
-    fontFamily: theme.typography.fontFamily.arabicBold,
-    fontSize: 20,
-    color: theme.colors.textPrimary,
-    textAlign: rtlTextAlign(),
-  },
-  headerCount: {
-    fontFamily: theme.typography.fontFamily.arabic,
-    fontSize: 13,
-    color: theme.colors.textSecondary,
-    textAlign: rtlTextAlign(),
   },
 
   // ── List ────────────────────────────────────────────────────────────────────

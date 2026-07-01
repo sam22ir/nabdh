@@ -26,6 +26,7 @@ import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import AppointmentCard from '@/components/AppointmentCard';
 import EmptyState from '@/components/EmptyState';
+import { AppHeader, Badge, LoadingState } from '@/components/ui';
 import { theme } from '@/lib/theme';
 import { getArabicErrorMessage } from '@/lib/errorMessages';
 import type { AppointmentStatus } from '@/lib/types';
@@ -129,17 +130,17 @@ const EMPTY_MESSAGES: Record<
   { icon: string; title: string; subtitle: string }
 > = {
   upcoming: {
-    icon: '📅',
+    icon: 'calendar-outline',
     title: 'لا يوجد مواعيد قادمة',
     subtitle: 'احجز موعداً جديداً مع أحد الأطباء',
   },
   past: {
-    icon: '📋',
+    icon: 'document-text-outline',
     title: 'لا يوجد مواعيد سابقة',
     subtitle: 'سجل مواعيدك السابقة سيظهر هنا',
   },
   cancelled: {
-    icon: '🚫',
+    icon: 'close-circle-outline',
     title: 'لا يوجد مواعيد ملغاة',
     subtitle: 'المواعيد التي تم إلغاؤها ستظهر هنا',
   },
@@ -563,6 +564,15 @@ export default function AppointmentsScreen() {
     return new Set(pending.map((entry) => entry.bookingId));
   }, [pendingReviewsQuery]);
 
+  const tabCounts = useMemo(
+    () => ({
+      upcoming: filterUpcoming(allAppointments).length,
+      past: filterPast(allAppointments).length,
+      cancelled: filterCancelled(allAppointments).length,
+    }),
+    [allAppointments],
+  );
+
   // ── Cancel mutation ─────────────────────────────────────────────────────
   const cancelBooking = useMutation(api.bookings.cancel);
   const createReview = useMutation(api.reviews.create);
@@ -610,6 +620,7 @@ export default function AppointmentsScreen() {
                 params: {
                   doctorId: item.doctorId,
                   clinicId: item.clinicId,
+                  rescheduleBookingId: item.id,
                 },
               } as any);
             },
@@ -666,6 +677,7 @@ export default function AppointmentsScreen() {
         params: {
           doctorId: item.doctorId,
           clinicId: item.clinicId,
+          rescheduleBookingId: item.id,
         },
       } as any);
     },
@@ -778,13 +790,13 @@ export default function AppointmentsScreen() {
   if (isLoading) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>مواعيدي</Text>
-        </View>
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
-          <Text style={styles.loadingText}>جاري تحميل المواعيد...</Text>
-        </View>
+        <AppHeader
+          eyebrow="مواعيدك"
+          title="مواعيدي"
+          subtitle="تابع مواعيدك القادمة والسابقة والملغاة من مكان واحد."
+          icon="calendar-outline"
+        />
+        <LoadingState label="جاري تحميل المواعيد..." />
       </SafeAreaView>
     );
   }
@@ -794,13 +806,22 @@ export default function AppointmentsScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>مواعيدي</Text>
-      </View>
+      <AppHeader
+        eyebrow="مواعيدك"
+        title="مواعيدي"
+        subtitle="تابع موعدك القادم، راجع المواعيد السابقة، أو أعد الحجز بسرعة."
+        icon="calendar-outline"
+        action={
+          <Badge
+            label={`${allAppointments.length} موعد`}
+            tone={allAppointments.length > 0 ? 'info' : 'neutral'}
+            icon="list-outline"
+          />
+        }
+      />
 
       {/* Tab bar */}
-      <View style={styles.tabBar}>
+      <View style={styles.segmentedTabs}>
         {TABS.map((tab) => {
           const isActive = tab.key === activeTab;
           return (
@@ -819,6 +840,14 @@ export default function AppointmentsScreen() {
                 ]}
               >
                 {tab.label}
+              </Text>
+              <Text
+                style={[
+                  styles.tabCount,
+                  isActive && styles.tabCountActive,
+                ]}
+              >
+                {tabCounts[tab.key]}
               </Text>
             </Pressable>
           );
@@ -886,7 +915,6 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: theme.colors.background,
-    writingDirection: 'rtl',
   },
   centerContainer: {
     flex: 1,
@@ -894,46 +922,49 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  // ── Header ──────────────────────────────────────────────────────────────
-  header: {
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: theme.colors.border,
-    backgroundColor: theme.colors.white,
-  },
-  headerTitle: {
-    fontFamily: theme.typography.fontFamily.arabicBold,
-    fontSize: 18,
-    color: theme.colors.textPrimary,
-    textAlign: 'right',
-  },
-
   // ── Tab Bar ─────────────────────────────────────────────────────────────
-  tabBar: {
+  segmentedTabs: {
     flexDirection: 'row',
-    backgroundColor: theme.colors.white,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    backgroundColor: theme.colors.surfaceMuted,
+    borderWidth: 1,
     borderBottomColor: theme.colors.border,
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.md,
+    marginHorizontal: theme.spacing.lg,
+    marginBottom: theme.spacing.sm,
+    padding: theme.spacing.xs,
+    gap: theme.spacing.xs,
   },
   tab: {
     flex: 1,
     alignItems: 'center',
-    paddingVertical: theme.spacing.md,
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
+    justifyContent: 'center',
+    minHeight: 48,
+    borderRadius: theme.borderRadius.sm,
+    paddingVertical: theme.spacing.sm,
   },
   tabActive: {
-    borderBottomColor: theme.colors.primary,
+    backgroundColor: theme.colors.surfaceRaised,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   tabText: {
     fontFamily: theme.typography.fontFamily.arabic,
-    fontSize: 15,
+    fontSize: 13,
     color: theme.colors.textSecondary,
   },
   tabTextActive: {
     fontFamily: theme.typography.fontFamily.arabicBold,
-    color: theme.colors.primary,
+    color: theme.colors.official,
+  },
+  tabCount: {
+    fontFamily: theme.typography.fontFamily.latinMedium,
+    fontSize: 11,
+    color: theme.colors.textMuted,
+    marginTop: 1,
+  },
+  tabCountActive: {
+    color: theme.colors.official,
   },
 
   // ── List ────────────────────────────────────────────────────────────────

@@ -1,5 +1,12 @@
 import React, { useState, useCallback } from 'react';
-import { View, TextInput, Pressable, StyleSheet } from 'react-native';
+import {
+  View,
+  TextInput,
+  Pressable,
+  StyleProp,
+  StyleSheet,
+  ViewStyle,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../lib/theme';
 import { rtlTextAlign } from '../lib/rtl';
@@ -17,6 +24,8 @@ export interface SearchBarProps {
   onFilterPress?: () => void;
   /** Placeholder text. Defaults to Arabic. */
   placeholder?: string;
+  /** Optional outer container override for embedded layouts. */
+  containerStyle?: StyleProp<ViewStyle>;
 }
 
 // ─── Component ─────────────────────────────────────────────────────────────────
@@ -27,6 +36,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
   onSubmit,
   onFilterPress,
   placeholder = 'ابحث عن طبيب، تخصص، أو مدينة...',
+  containerStyle,
 }) => {
   const [internalValue, setInternalValue] = useState('');
   const [isFocused, setIsFocused] = useState(false);
@@ -53,7 +63,13 @@ const SearchBar: React.FC<SearchBarProps> = ({
   const hasText = value.length > 0;
 
   return (
-    <View style={[styles.container, isFocused && styles.containerFocused]}>
+    <View
+      style={[
+        styles.container,
+        isFocused && styles.containerFocused,
+        containerStyle,
+      ]}
+    >
       {/* Search icon */}
       <View style={styles.searchIconContainer}>
         <Ionicons name="search" size={20} color={theme.colors.textSecondary} />
@@ -99,7 +115,11 @@ const SearchBar: React.FC<SearchBarProps> = ({
         accessibilityRole="button"
         accessibilityLabel="تصفية"
       >
-        <Ionicons name="options-outline" size={22} color={theme.colors.primary} />
+        <Ionicons
+          name="options-outline"
+          size={22}
+          color={theme.colors.primary}
+        />
       </Pressable>
     </View>
   );
@@ -111,17 +131,18 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.white,
-    borderRadius: theme.borderRadius.lg,
+    backgroundColor: theme.colors.surfaceRaised,
+    borderRadius: theme.borderRadius.md,
     borderWidth: 1,
     borderColor: theme.colors.border,
     paddingHorizontal: theme.spacing.md,
-    height: 48,
+    minHeight: 50,
     marginHorizontal: theme.spacing.lg,
     marginVertical: theme.spacing.sm,
   },
   containerFocused: {
-    borderColor: theme.colors.primary,
+    borderColor: theme.colors.focus,
+    backgroundColor: theme.colors.white,
   },
   searchIconContainer: {
     marginLeft: theme.spacing.sm,
@@ -145,8 +166,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: theme.spacing.sm,
-    borderLeftWidth: 1,
-    borderLeftColor: theme.colors.border,
+    borderRightWidth: 1,
+    borderRightColor: theme.colors.border,
     marginLeft: theme.spacing.sm,
   },
 });

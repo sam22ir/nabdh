@@ -7,7 +7,6 @@
 
 import React, { useCallback, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   Modal,
   Pressable,
   ScrollView,
@@ -19,10 +18,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuthActions } from '@convex-dev/auth/react';
+import { useClerk } from '@clerk/clerk-expo';
 import { useMutation, useQuery } from 'convex/react';
 
 import { api } from '@/convex/_generated/api';
+import { AppHeader, Badge, LoadingState, Panel } from '@/components/ui';
 import { theme } from '@/lib/theme';
 import { rtlTextAlign } from '@/lib/rtl';
 import { getArabicErrorMessage } from '@/lib/errorMessages';
@@ -160,7 +160,7 @@ const ProfileSection: React.FC<{
 }> = ({ title, children }) => (
   <View style={styles.sectionContainer}>
     {title ? <Text style={styles.sectionTitle}>{title}</Text> : null}
-    <View style={styles.sectionCard}>{children}</View>
+    <Panel style={styles.sectionCard}>{children}</Panel>
   </View>
 );
 
@@ -187,12 +187,13 @@ const ActionModal: React.FC<ActionModalProps> = ({
     animationType="fade"
     onRequestClose={onClose}
   >
-    <Pressable
-      style={styles.modalOverlay}
-      onPress={onClose}
-      accessibilityRole="button"
-      accessibilityLabel="إغلاق"
-    >
+    <View style={styles.modalOverlay}>
+      <Pressable
+        style={styles.modalBackdrop}
+        onPress={onClose}
+        accessibilityRole="button"
+        accessibilityLabel="إغلاق"
+      />
       <View
         style={styles.modalContent}
         onStartShouldSetResponder={() => true}
@@ -214,7 +215,7 @@ const ActionModal: React.FC<ActionModalProps> = ({
         </View>
         {children}
       </View>
-    </Pressable>
+    </View>
   </Modal>
 );
 
@@ -265,7 +266,7 @@ const FamilyProfileItem: React.FC<FamilyProfileItemProps> = ({
 
 export default function PatientProfileScreen() {
   const router = useRouter();
-  const { signOut } = useAuthActions();
+  const { signOut } = useClerk();
   const me = useQuery(api.users.me, {});
   const familyProfilesQuery = useQuery(api.patientProfiles.listMy, {});
   const wilayasQuery = useQuery(api.locations.listWilayas, {});
@@ -436,9 +437,13 @@ export default function PatientProfileScreen() {
   if (me === undefined || familyProfilesQuery === undefined) {
     return (
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
-        </View>
+        <AppHeader
+          eyebrow="حسابك"
+          title="ملفي"
+          subtitle="جاري تجهيز معلومات الحساب والملفات الطبية."
+          icon="person-circle-outline"
+        />
+        <LoadingState label="جاري تحميل الملف..." />
       </SafeAreaView>
     );
   }
@@ -474,22 +479,23 @@ export default function PatientProfileScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Header ──────────────────────────────────────────── */}
-        <View style={styles.header}>
-          <View style={styles.avatarContainer}>
-            <Ionicons
-              name="person-circle"
-              size={80}
-              color={theme.colors.primary}
+        <AppHeader
+          eyebrow="حسابك"
+          title={user.fullNameAr ?? user.name ?? 'ملفي'}
+          subtitle={user.email ?? 'إدارة بياناتك وملفات العائلة'}
+          icon="person-circle-outline"
+          action={
+            <Badge
+              label={user.profile ? 'ملف مكتمل' : 'ناقص'}
+              tone={user.profile ? 'success' : 'warning'}
+              icon={
+                user.profile
+                  ? 'shield-checkmark-outline'
+                  : 'alert-circle-outline'
+              }
             />
-          </View>
-          <Text style={styles.headerName} numberOfLines={1}>
-            {user.fullNameAr}
-          </Text>
-          <Text style={styles.headerEmail} numberOfLines={1}>
-            {user.email ?? ''}
-          </Text>
-        </View>
+          }
+        />
 
         {!user.profile ? (
           <View style={styles.completeProfileCard}>
@@ -931,7 +937,7 @@ export default function PatientProfileScreen() {
       >
         <View style={styles.modalBody}>
           <Text style={styles.privacyText}>
-            نحافظ على بياناتك الصحية والشخصية داخل نبد ونستخدمها فقط لتقديم
+            نحافظ على بياناتك الصحية والشخصية داخل نبض ونستخدمها فقط لتقديم
             خدمات الحجز والمتابعة الطبية. لا نشارك معلوماتك مع أي طرف غير
             مصرح له، ويمكنك تسجيل الخروج أو طلب تحديث بياناتك في أي وقت.
           </Text>
@@ -997,7 +1003,6 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: theme.colors.background,
-    writingDirection: 'rtl',
   },
   scrollContent: {
     paddingBottom: theme.spacing['2xl'],
@@ -1129,10 +1134,8 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.sm,
   },
   sectionCard: {
-    backgroundColor: theme.colors.white,
-    borderRadius: theme.borderRadius.lg,
     marginHorizontal: theme.spacing.lg,
-    ...theme.shadows.sm,
+    padding: 0,
   },
 
   // ── Row ──────────────────────────────────────────────────────────────────
@@ -1307,6 +1310,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.45)',
     justifyContent: 'flex-end',
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFill,
   },
   modalContent: {
     backgroundColor: theme.colors.white,

@@ -1,9 +1,7 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import {
-  ActivityIndicator,
   FlatList,
   Pressable,
-  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -19,9 +17,10 @@ import { api } from '@/convex/_generated/api';
 import DoctorCard, { DoctorCardData } from '@/components/DoctorCard';
 import EmptyState from '@/components/EmptyState';
 import SpecialtyGrid, { SpecialtyItem } from '@/components/SpecialtyGrid';
+import { AppHeader, Badge, LoadingState, Panel, TrustRow } from '@/components/ui';
 import { theme } from '@/lib/theme';
 import { rtlTextAlign } from '@/lib/rtl';
-import type { Appointment, AppointmentStatus, VisitType } from '@/lib/types';
+import type { Appointment, AppointmentStatus } from '@/lib/types';
 import type { Id } from '@/convex/_generated/dataModel';
 
 // =============================================================================
@@ -30,15 +29,33 @@ import type { Id } from '@/convex/_generated/dataModel';
 
 /** Common specialties for quick access row. */
 const POPULAR_SPECIALTIES: SpecialtyItem[] = [
-  { id: '1', nameAr: 'عام', icon: '🩺' },
-  { id: '2', nameAr: 'أسنان', icon: '🦷' },
-  { id: '3', nameAr: 'قلب', icon: '❤️' },
-  { id: '4', nameAr: 'عيون', icon: '👁️' },
-  { id: '5', nameAr: 'جلدية', icon: '🧴' },
-  { id: '6', nameAr: 'أطفال', icon: '👶' },
-  { id: '7', nameAr: 'نساء', icon: '👩‍⚕️' },
-  { id: '8', nameAr: 'عظام', icon: '🦴' },
+  { id: '1', nameAr: 'عام', icon: 'medical-outline' },
+  { id: '2', nameAr: 'أسنان', icon: 'medkit-outline' },
+  { id: '3', nameAr: 'قلب', icon: 'fitness-outline' },
+  { id: '4', nameAr: 'عيون', icon: 'eye-outline' },
+  { id: '5', nameAr: 'جلدية', icon: 'body-outline' },
+  { id: '6', nameAr: 'أطفال', icon: 'people-outline' },
+  { id: '7', nameAr: 'نساء', icon: 'woman-outline' },
+  { id: '8', nameAr: 'عظام', icon: 'walk-outline' },
 ];
+
+function getSpecialtyIcon(nameAr: string, seedIcon?: string | null): string {
+  if (seedIcon && seedIcon in Ionicons.glyphMap) {
+    return seedIcon;
+  }
+
+  if (nameAr.includes('قلب')) return 'fitness-outline';
+  if (nameAr.includes('جلد')) return 'body-outline';
+  if (nameAr.includes('أطفال')) return 'people-outline';
+  if (nameAr.includes('نساء')) return 'woman-outline';
+  if (nameAr.includes('عظام')) return 'walk-outline';
+  if (nameAr.includes('عيون')) return 'eye-outline';
+  if (nameAr.includes('أنف') || nameAr.includes('أذن')) return 'medical-outline';
+  if (nameAr.includes('أعصاب')) return 'pulse-outline';
+  if (nameAr.includes('أسنان')) return 'medkit-outline';
+
+  return 'medical-outline';
+}
 
 interface UpcomingAppointment extends Omit<Appointment, 'id' | 'profileId' | 'patientNote' | 'reason' | 'cancelledBy' | 'cancellationReason' | 'createdAt'> {
   id: Id<'bookings'>;
@@ -146,41 +163,42 @@ const UpcomingAppointmentCard: React.FC<UpcomingAppointmentCardProps> = ({
     accessibilityRole="button"
     accessibilityLabel={`موعدك القادم مع الدكتور ${appointment.doctorName}`}
   >
-    {/* Card header */}
-    <View style={styles.upcomingHeader}>
-      <View style={styles.upcomingHeaderLeft}>
-        <Ionicons name="calendar" size={18} color={theme.colors.primary} />
-        <Text style={styles.upcomingHeaderTitle}>موعدك القادم</Text>
+    <Panel style={styles.upcomingPanel}>
+      {/* Card header */}
+      <View style={styles.upcomingHeader}>
+        <View style={styles.upcomingHeaderLeft}>
+          <Ionicons name="calendar" size={18} color={theme.colors.primary} />
+          <Text style={styles.upcomingHeaderTitle}>موعدك القادم</Text>
+        </View>
+        <Badge label="مؤكد" tone="success" icon="checkmark-circle-outline" />
       </View>
-      <View style={styles.upcomingBadge}>
-        <Text style={styles.upcomingBadgeText}>مؤكد</Text>
-      </View>
-    </View>
 
-    {/* Doctor name & specialty */}
-    <Text style={styles.upcomingDoctorName}>د. {appointment.doctorName}</Text>
-    <Text style={styles.upcomingSpecialty}>{appointment.specialty}</Text>
+      {/* Doctor name & specialty */}
+      <Text style={styles.upcomingDoctorName}>د. {appointment.doctorName}</Text>
+      <Text style={styles.upcomingSpecialty}>{appointment.specialty}</Text>
 
-    {/* Divider */}
-    <View style={styles.upcomingDivider} />
+      {/* Divider */}
+      <View style={styles.upcomingDivider} />
 
-    {/* Details row: date, time, clinic */}
-    <View style={styles.upcomingDetails}>
-      <View style={styles.upcomingDetailItem}>
-        <Ionicons name="calendar-outline" size={16} color={theme.colors.textSecondary} />
-        <Text style={styles.upcomingDetailText}>
-          {formatArabicDate(appointment.appointmentDate)}
-        </Text>
+      {/* Details row: date, time, clinic */}
+      <View style={styles.upcomingDetails}>
+        <TrustRow
+          icon="calendar-outline"
+          label="التاريخ"
+          value={formatArabicDate(appointment.appointmentDate)}
+        />
+        <TrustRow
+          icon="time-outline"
+          label="الوقت"
+          value={appointment.appointmentTime}
+        />
+        <TrustRow
+          icon="location-outline"
+          label="العيادة"
+          value={appointment.clinicName}
+        />
       </View>
-      <View style={styles.upcomingDetailItem}>
-        <Ionicons name="time-outline" size={16} color={theme.colors.textSecondary} />
-        <Text style={styles.upcomingDetailText}>{appointment.appointmentTime}</Text>
-      </View>
-      <View style={styles.upcomingDetailItem}>
-        <Ionicons name="location-outline" size={16} color={theme.colors.textSecondary} />
-        <Text style={styles.upcomingDetailText}>{appointment.clinicName}</Text>
-      </View>
-    </View>
+    </Panel>
   </Pressable>
 );
 
@@ -264,7 +282,7 @@ export default function PatientHomeScreen() {
       return homeData.commonSpecialties.map((s: any) => ({
         id: s._id,
         nameAr: s.nameAr,
-        icon: s.icon || '🩺',
+        icon: getSpecialtyIcon(s.nameAr, s.icon),
       }));
     }
     return POPULAR_SPECIALTIES;
@@ -322,10 +340,7 @@ export default function PatientHomeScreen() {
   if (isLoading) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
-          <Text style={styles.loadingText}>جاري التحميل...</Text>
-        </View>
+        <LoadingState label="جاري تحميل الصفحة الرئيسية..." />
       </SafeAreaView>
     );
   }
@@ -337,24 +352,24 @@ export default function PatientHomeScreen() {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        nestedScrollEnabled
+        directionalLockEnabled
       >
-        {/* ── Greeting Section ────────────────────────────────── */}
-        <View style={styles.greetingSection}>
-          <View style={styles.greetingTextContainer}>
-            <Text style={styles.greetingEmoji}>{greeting === 'صباح الخير' ? '🌅' : '🌙'}</Text>
-            <View>
-              <Text style={styles.greetingText}>
-                {greeting}،
-              </Text>
-              <Text style={styles.greetingName} numberOfLines={1}>
-                {patientName} 👋
-              </Text>
+        <AppHeader
+          eyebrow={greeting}
+          title={patientName}
+          subtitle="ابحث عن طبيب، راجع موعدك القادم، أو ابدأ حجزا جديدا."
+          icon="person-circle-outline"
+          action={
+            <View style={styles.greetingNotification}>
+              <Ionicons
+                name="notifications-outline"
+                size={22}
+                color={theme.colors.official}
+              />
             </View>
-          </View>
-          <View style={styles.greetingNotification}>
-            <Ionicons name="notifications-outline" size={24} color={theme.colors.textPrimary} />
-          </View>
-        </View>
+          }
+        />
 
         {/* ── Upcoming Appointment Section ─────────────────────── */}
         <SectionHeader
@@ -369,7 +384,7 @@ export default function PatientHomeScreen() {
           />
         ) : (
           <EmptyState
-            icon="📅"
+            icon="calendar-outline"
             title="لا يوجد موعد قادم"
             subtitle="احجز موعدك مع أحد الأطباء لبدء رحلة علاجك"
             action={{ label: 'احجز موعد', onPress: handleBookAppointment }}
@@ -401,7 +416,7 @@ export default function PatientHomeScreen() {
           </View>
         ) : (
           <EmptyState
-            icon="🩺"
+            icon="medical-outline"
             title="لا يوجد أطباء قريبون"
             subtitle="جرّب البحث لاختيار طبيب حسب التخصص أو الولاية"
             action={{ label: 'ابحث عن طبيب', onPress: handleViewAllDoctors }}
@@ -438,17 +453,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: theme.spacing['2xl'],
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontFamily: theme.typography.fontFamily.arabic,
-    fontSize: 14,
-    color: theme.colors.textSecondary,
-    marginTop: theme.spacing.md,
-  },
   bottomSpacer: {
     height: theme.spacing['4xl'],
   },
@@ -456,43 +460,15 @@ const styles = StyleSheet.create({
     height: theme.spacing.xs,
   },
 
-  // ─── Greeting Section ────────────────────────────────────────────────────
-  greetingSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing.lg,
-    paddingTop: theme.spacing.lg,
-    paddingBottom: theme.spacing.md,
-  },
-  greetingTextContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  greetingEmoji: {
-    fontSize: 28,
-    marginLeft: theme.spacing.md,
-  },
-  greetingText: {
-    fontFamily: theme.typography.fontFamily.arabic,
-    fontSize: 16,
-    color: theme.colors.textSecondary,
-  },
-  greetingName: {
-    fontFamily: theme.typography.fontFamily.arabicBold,
-    fontSize: 22,
-    color: theme.colors.textPrimary,
-    marginTop: theme.spacing.xs,
-    textAlign: rtlTextAlign(),
-  },
   greetingNotification: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    backgroundColor: theme.colors.white,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.surfaceRaised,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
     alignItems: 'center',
     justifyContent: 'center',
-    ...theme.shadows.sm,
   },
 
   // ─── Section Header ──────────────────────────────────────────────────────
@@ -528,15 +504,14 @@ const styles = StyleSheet.create({
 
   // ─── Upcoming Appointment Card ───────────────────────────────────────────
   upcomingCard: {
-    backgroundColor: theme.colors.white,
-    borderRadius: theme.borderRadius.lg,
-    padding: theme.spacing.lg,
     marginHorizontal: theme.spacing.lg,
     marginVertical: theme.spacing.xs,
-    ...theme.shadows.md,
   },
   upcomingCardPressed: {
     opacity: 0.92,
+  },
+  upcomingPanel: {
+    gap: theme.spacing.md,
   },
   upcomingHeader: {
     flexDirection: 'row',
@@ -553,17 +528,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: theme.colors.primary,
     marginRight: theme.spacing.sm,
-  },
-  upcomingBadge: {
-    backgroundColor: '#E8F8EE',
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.xs,
-    borderRadius: theme.borderRadius.sm,
-  },
-  upcomingBadgeText: {
-    fontFamily: theme.typography.fontFamily.arabicBold,
-    fontSize: 12,
-    color: theme.colors.success,
   },
   upcomingDoctorName: {
     fontFamily: theme.typography.fontFamily.arabicBold,
@@ -586,16 +550,6 @@ const styles = StyleSheet.create({
   },
   upcomingDetails: {
     gap: theme.spacing.sm,
-  },
-  upcomingDetailItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  upcomingDetailText: {
-    fontFamily: theme.typography.fontFamily.arabic,
-    fontSize: 13,
-    color: theme.colors.textSecondary,
-    marginRight: theme.spacing.sm,
   },
 
   // ─── Doctors List ────────────────────────────────────────────────────────

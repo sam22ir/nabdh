@@ -1,10 +1,7 @@
 import React from 'react';
-import {
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { Button, Panel } from '@/components/ui';
 import { theme } from '../lib/theme';
 import { rtlTextAlign } from '../lib/rtl';
 
@@ -16,7 +13,7 @@ export interface ActionButton {
 }
 
 export interface EmptyStateProps {
-  /** Emoji string rendered as the icon. */
+  /** Ionicons name is preferred; emoji strings are still supported for old call sites. */
   icon?: string;
   /** Primary title displayed in Arabic. */
   title: string;
@@ -34,24 +31,35 @@ const EmptyState: React.FC<EmptyStateProps> = ({
   subtitle,
   action,
 }) => {
+  const isIonicon = icon && icon in Ionicons.glyphMap;
+
   return (
     <View style={styles.container} accessibilityRole="text">
-      {icon ? <Text style={styles.icon}>{icon}</Text> : null}
-      <Text style={styles.title}>{title}</Text>
-      <Text style={styles.subtitle}>{subtitle}</Text>
-      {action ? (
-        <Pressable
-          style={({ pressed }) => [
-            styles.actionButton,
-            pressed && styles.actionButtonPressed,
-          ]}
-          onPress={action.onPress}
-          accessibilityRole="button"
-          accessibilityLabel={action.label}
-        >
-          <Text style={styles.actionLabel}>{action.label}</Text>
-        </Pressable>
-      ) : null}
+      <Panel style={styles.panel}>
+        {icon ? (
+          <View style={styles.iconFrame}>
+            {isIonicon ? (
+              <Ionicons
+                name={icon as keyof typeof Ionicons.glyphMap}
+                size={24}
+                color={theme.colors.official}
+              />
+            ) : (
+              <Text style={styles.iconFallback}>{icon}</Text>
+            )}
+          </View>
+        ) : null}
+        <Text style={styles.title}>{title}</Text>
+        <Text style={styles.subtitle}>{subtitle}</Text>
+        {action ? (
+          <Button
+            label={action.label}
+            onPress={action.onPress}
+            icon="arrow-back"
+            style={styles.actionButton}
+          />
+        ) : null}
+      </Panel>
     </View>
   );
 };
@@ -60,15 +68,26 @@ const EmptyState: React.FC<EmptyStateProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    paddingHorizontal: theme.spacing['3xl'],
+    paddingVertical: theme.spacing['3xl'],
+  },
+  panel: {
+    alignItems: 'center',
+    paddingVertical: theme.spacing['3xl'],
+  },
+  iconFrame: {
+    width: 52,
+    height: 52,
+    borderRadius: theme.borderRadius.lg,
+    backgroundColor: theme.colors.surfaceMuted,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: theme.spacing['3xl'],
-    paddingVertical: theme.spacing['5xl'],
-  },
-  icon: {
-    fontSize: 64,
     marginBottom: theme.spacing.lg,
+  },
+  iconFallback: {
+    fontSize: 24,
   },
   title: {
     fontFamily: theme.typography.fontFamily.arabicBold,
@@ -86,19 +105,7 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     marginTop: theme.spacing['2xl'],
-    backgroundColor: theme.colors.primary,
-    paddingHorizontal: theme.spacing['2xl'],
-    paddingVertical: theme.spacing.md,
-    borderRadius: theme.borderRadius.lg,
-  },
-  actionButtonPressed: {
-    opacity: 0.85,
-  },
-  actionLabel: {
-    fontFamily: theme.typography.fontFamily.arabicBold,
-    fontSize: 15,
-    color: theme.colors.white,
-    textAlign: 'center',
+    alignSelf: 'stretch',
   },
 });
 

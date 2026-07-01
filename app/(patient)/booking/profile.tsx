@@ -140,11 +140,13 @@ export default function BookingProfileScreen() {
       clinicId?: string | string[];
       date?: string | string[];
       time?: string | string[];
+      rescheduleBookingId?: string | string[];
     }>();
   const doctorId = routeParamString(params.doctorId);
   const clinicId = routeParamString(params.clinicId);
   const date = routeParamString(params.date);
   const time = routeParamString(params.time);
+  const rescheduleBookingId = routeParamString(params.rescheduleBookingId);
   const hasValidBookingParams =
     Boolean(doctorId && clinicId) && isIsoDateParam(date) && isTimeParam(time);
 
@@ -174,9 +176,18 @@ export default function BookingProfileScreen() {
         date,
         time,
         profileId,
+        rescheduleBookingId,
       },
     } as any);
-  }, [router, doctorId, clinicId, date, time, selectedProfileId]);
+  }, [
+    router,
+    doctorId,
+    clinicId,
+    date,
+    time,
+    selectedProfileId,
+    rescheduleBookingId,
+  ]);
 
   // ── Loading state ───────────────────────────────────────────────────────
   if (isLoading) {

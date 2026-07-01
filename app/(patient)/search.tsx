@@ -2,15 +2,15 @@
 // Imports
 // =============================================================================
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   FlatList,
   Keyboard,
   ListRenderItemInfo,
   Modal,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Pressable,
-  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -26,6 +26,7 @@ import { api } from '@/convex/_generated/api';
 import DoctorCard, { DoctorCardData } from '@/components/DoctorCard';
 import SearchBar from '@/components/SearchBar';
 import EmptyState from '@/components/EmptyState';
+import { Badge, Button, LoadingState } from '@/components/ui';
 import { theme } from '@/lib/theme';
 import { rtlTextAlign } from '@/lib/rtl';
 import { routeParamString } from '@/lib/routeParams';
@@ -52,6 +53,7 @@ function toDoctorCardData(r: {
   _id: string;
   user: { fullNameAr: string | null };
   specialty: { nameAr: string };
+  wilaya?: { nameAr: string } | null;
   avgRating: number;
   totalReviews: number;
   isVerified: boolean;
@@ -62,7 +64,7 @@ function toDoctorCardData(r: {
     specialty: { nameAr: r.specialty.nameAr },
     avgRating: r.avgRating,
     totalReviews: r.totalReviews,
-    wilaya: { nameAr: '' },
+    wilaya: { nameAr: r.wilaya?.nameAr ?? '' },
     isVerified: r.isVerified,
     avatarUrl: null,
   };
@@ -206,6 +208,11 @@ function DropdownPicker({
 
 const ItemSeparator: React.FC = () => <View style={styles.separator} />;
 
+const genderOptions: FlatOption[] = [
+  { id: 'male', nameAr: 'ذكر' },
+  { id: 'female', nameAr: 'أنثى' },
+];
+
 // =============================================================================
 // Main Screen
 // =============================================================================
@@ -225,11 +232,14 @@ export default function PatientSearchScreen() {
   const [genderFilter, setGenderFilter] = useState<GenderValue | null>(null);
   const [availableTodayOnly, setAvailableTodayOnly] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  const [filtersCollapsed, setFiltersCollapsed] = useState(false);
+  const lastResultsScrollYRef = useRef(0);
 
   // ── Dropdown visibility ───────────────────────────────────────────────────
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [showWilayaPicker, setShowWilayaPicker] = useState(false);
   const [showSpecialtyPicker, setShowSpecialtyPicker] = useState(false);
+  const [showGenderPicker, setShowGenderPicker] = useState(false);
 
   // ── Data queries ──────────────────────────────────────────────────────────
   const specialties = useQuery(api.specialties.list, {});
@@ -302,8 +312,8 @@ export default function PatientSearchScreen() {
   const isLoading = paginatedLoading || searchLoading;
   const dataSource = isSearching && searchQueryText ? searchResults : allResults;
   const listStatus = isSearching && searchQueryText ? searchStatus : paginatedStatus;
+  const doctors = dataSource ?? [];
 
-  // ── Client-side text filter (applied on top of server data) ──────────────
   const selectedSpecialty = useMemo(
     () => specialtyOptions.find((s) => s.id === selectedSpecialtyId),
     [selectedSpecialtyId, specialtyOptions],
@@ -312,25 +322,6 @@ export default function PatientSearchScreen() {
     () => wilayaOptions.find((w) => w.id === selectedWilayaId),
     [selectedWilayaId, wilayaOptions],
   );
-
-  const filteredDoctors = useMemo(() => {
-    if (!dataSource) return [];
-
-    return dataSource.filter((d: any) => {
-      if (selectedSpecialtyId && d.specialtyId !== selectedSpecialtyId) {
-        return false;
-      }
-
-      // Free-text search (always client-side for instant feedback)
-      if (searchText) {
-        const q = searchText.trim();
-        const nameHit = (d.user?.fullNameAr ?? '').includes(q);
-        const specHit = (d.specialty?.nameAr ?? '').includes(q);
-        if (!nameHit && !specHit) return false;
-      }
-      return true;
-    });
-  }, [dataSource, searchText, selectedSpecialtyId]);
 
   // ── Derived display values ────────────────────────────────────────────────
   const activeFiltersCount = useMemo(() => {
@@ -366,25 +357,38 @@ export default function PatientSearchScreen() {
 
   const handleSpecialtySelect = useCallback((val: string | null) => {
     setSelectedSpecialtyId((val ?? undefined) as Id<'specialties'> | undefined);
-    setSearchText('');
   }, []);
 
   const handleWilayaSelect = useCallback((val: string | null) => {
     setSelectedWilayaId(val as Id<'wilayas'> | null);
-    setSearchText('');
   }, []);
 
-  const handleGenderToggle = useCallback(() => {
-    setGenderFilter((prev) => {
-      if (prev === null) return 'male';
-      if (prev === 'male') return 'female';
-      return null;
-    });
+  const handleGenderSelect = useCallback((val: string | null) => {
+    setGenderFilter(val as GenderValue | null);
   }, []);
 
   const handleAvailableTodayToggle = useCallback(() => {
     setAvailableTodayOnly((prev) => !prev);
   }, []);
+
+  const handleResultsScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const currentY = Math.max(0, event.nativeEvent.contentOffset.y);
+      const previousY = lastResultsScrollYRef.current;
+      const deltaY = currentY - previousY;
+
+      if (currentY <= 12) {
+        setFiltersCollapsed(false);
+      } else if (deltaY > 16) {
+        setFiltersCollapsed(true);
+      } else if (deltaY < -16) {
+        setFiltersCollapsed(false);
+      }
+
+      lastResultsScrollYRef.current = currentY;
+    },
+    [],
+  );
 
   // ── List renderers ────────────────────────────────────────────────────────
   const renderDoctor = useCallback(
@@ -407,170 +411,246 @@ export default function PatientSearchScreen() {
   if (isLoading && !dataSource) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
-          <Text style={styles.loadingText}>جاري تحميل الأطباء...</Text>
-        </View>
+        <LoadingState label="جاري تحميل الأطباء..." />
       </SafeAreaView>
     );
   }
 
-  // ── Main render ───────────────────────────────────────────────────────────
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      {/* Search Bar */}
-      <SearchBar
-        value={searchText}
-        onChangeText={setSearchText}
-        onSubmit={handleSubmit}
-        onFilterPress={() => setFilterModalVisible(true)}
-      />
+  const searchListHeader = (
+    <>
+      <View style={styles.searchHeader}>
+        <View style={styles.headerMeta}>
+          <View style={styles.headerIcon}>
+            <Ionicons
+              name="search-outline"
+              size={18}
+              color={theme.colors.official}
+            />
+          </View>
+          <View style={styles.headerCopy}>
+            <Text style={styles.headerEyebrow}>دليل الأطباء</Text>
+            <Text style={styles.headerTitle}>ابحث عن طبيب</Text>
+            <Text style={styles.headerSubtitle}>
+              اختر التخصص والولاية ثم قارن الأطباء المتاحين.
+            </Text>
+          </View>
+        </View>
 
-      {/* Filter chips row */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.chipsRow}
-        contentContainerStyle={styles.chipsContent}
-        keyboardShouldPersistTaps="handled"
-      >
-        {/* Specialty chip */}
-        <TouchableOpacity
-          style={[
-            styles.chip,
-            selectedSpecialtyId !== undefined && styles.chipActive,
-          ]}
-          onPress={() => setShowSpecialtyPicker(true)}
-          accessibilityRole="button"
-          accessibilityLabel="تصفية حسب التخصص"
-        >
-          <Text
-            style={[
-              styles.chipText,
-              selectedSpecialtyId !== undefined && styles.chipTextActive,
-            ]}
-            numberOfLines={1}
-          >
-            {selectedSpecialtyId !== undefined
-              ? selectedSpecialty?.nameAr ?? 'التخصص'
-              : 'التخصص'}
-          </Text>
-          <Ionicons
-            name="chevron-down"
-            size={14}
-            color={
-              selectedSpecialtyId !== undefined
-                ? theme.colors.white
-                : theme.colors.textSecondary
-            }
+        <View style={styles.searchControls}>
+          <SearchBar
+            value={searchText}
+            onChangeText={setSearchText}
+            onSubmit={handleSubmit}
+            onFilterPress={() => setFilterModalVisible(true)}
+            containerStyle={styles.searchBarEmbedded}
           />
-        </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[
-            styles.chip,
-            selectedWilayaId !== null && styles.chipActive,
-          ]}
-          onPress={() => setShowWilayaPicker(true)}
-          accessibilityRole="button"
-          accessibilityLabel="تصفية حسب الولاية"
-        >
-          <Text
-            style={[
-              styles.chipText,
-              selectedWilayaId !== null && styles.chipTextActive,
-            ]}
-            numberOfLines={1}
-          >
-            {selectedWilayaId !== null
-              ? selectedWilaya?.nameAr ?? 'الولاية'
-              : 'الولاية'}
-          </Text>
-          <Ionicons
-            name="chevron-down"
-            size={14}
-            color={
-              selectedWilayaId !== null
-                ? theme.colors.white
-                : theme.colors.textSecondary
-            }
-          />
-        </TouchableOpacity>
+          {filtersCollapsed ? (
+            <TouchableOpacity
+              style={styles.collapsedFiltersButton}
+              onPress={() => setFiltersCollapsed(false)}
+              accessibilityRole="button"
+              accessibilityLabel="إظهار الفلاتر"
+            >
+              <View style={styles.collapsedFiltersCopy}>
+                <Ionicons
+                  name="options-outline"
+                  size={16}
+                  color={theme.colors.official}
+                />
+                <Text style={styles.collapsedFiltersText}>إظهار الفلاتر</Text>
+              </View>
+              <Text style={styles.collapsedFiltersMeta}>
+                {activeFiltersCount > 0
+                  ? `${activeFiltersCount} مفعلة`
+                  : 'كل النتائج'}
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.chipsContent}>
+              {/* Specialty chip */}
+              <TouchableOpacity
+                style={[
+                  styles.chip,
+                  selectedSpecialtyId !== undefined && styles.chipActive,
+                ]}
+                onPress={() => setShowSpecialtyPicker(true)}
+                accessibilityRole="button"
+                accessibilityLabel="تصفية حسب التخصص"
+              >
+                <Badge
+                  label={
+                    selectedSpecialtyId !== undefined
+                      ? selectedSpecialty?.nameAr ?? 'التخصص'
+                      : 'التخصص'
+                  }
+                  tone={selectedSpecialtyId !== undefined ? 'info' : 'neutral'}
+                />
+                <Ionicons
+                  name="chevron-down"
+                  size={14}
+                  color={
+                    selectedSpecialtyId !== undefined
+                      ? theme.colors.white
+                      : theme.colors.textSecondary
+                  }
+                />
+              </TouchableOpacity>
 
-        {/* Gender toggle */}
-        <TouchableOpacity
-          style={[styles.chip, genderFilter !== null && styles.chipActive]}
-          onPress={handleGenderToggle}
-          accessibilityRole="button"
-          accessibilityLabel="تصفية حسب الجنس"
-        >
-          <Ionicons
-            name={
-              genderFilter === 'male'
-                ? 'male'
-                : genderFilter === 'female'
-                  ? 'female'
-                  : 'people-outline'
-            }
-            size={16}
-            color={
-              genderFilter !== null
-                ? theme.colors.white
-                : theme.colors.textSecondary
-            }
-          />
-          <Text
-            style={[
-              styles.chipText,
-              genderFilter !== null && styles.chipTextActive,
-            ]}
-            numberOfLines={1}
-          >
-            {genderFilter === 'male'
-              ? 'ذكر'
-              : genderFilter === 'female'
-                ? 'أنثى'
-                : 'الجنس'}
-          </Text>
-        </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.chip,
+                  selectedWilayaId !== null && styles.chipActive,
+                ]}
+                onPress={() => setShowWilayaPicker(true)}
+                accessibilityRole="button"
+                accessibilityLabel="تصفية حسب الولاية"
+              >
+                <Badge
+                  label={
+                    selectedWilayaId !== null
+                      ? selectedWilaya?.nameAr ?? 'الولاية'
+                      : 'الولاية'
+                  }
+                  tone={selectedWilayaId !== null ? 'info' : 'neutral'}
+                />
+                <Ionicons
+                  name="chevron-down"
+                  size={14}
+                  color={
+                    selectedWilayaId !== null
+                      ? theme.colors.white
+                      : theme.colors.textSecondary
+                  }
+                />
+              </TouchableOpacity>
 
-        {/* Clear-all button — visible when any filter is active */}
-        {activeFiltersCount > 0 && (
+              {/* Gender toggle */}
+              <TouchableOpacity
+                style={[styles.chip, genderFilter !== null && styles.chipActive]}
+                onPress={() => setShowGenderPicker(true)}
+                accessibilityRole="button"
+                accessibilityLabel="تصفية حسب الجنس"
+              >
+                <Ionicons
+                  name={
+                    genderFilter === 'male'
+                      ? 'male'
+                      : genderFilter === 'female'
+                        ? 'female'
+                        : 'people-outline'
+                  }
+                  size={16}
+                  color={
+                    genderFilter !== null
+                      ? theme.colors.white
+                      : theme.colors.textSecondary
+                  }
+                />
+                <Badge
+                  label={
+                    genderFilter === 'male'
+                      ? 'ذكر'
+                      : genderFilter === 'female'
+                        ? 'أنثى'
+                        : 'الجنس'
+                  }
+                  tone={genderFilter !== null ? 'info' : 'neutral'}
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.chip,
+                  availableTodayOnly && styles.chipActive,
+                ]}
+                onPress={handleAvailableTodayToggle}
+                accessibilityRole="button"
+                accessibilityLabel="تصفية حسب الأطباء المتاحين اليوم"
+              >
+                <Ionicons
+                  name="calendar-outline"
+                  size={16}
+                  color={
+                    availableTodayOnly
+                      ? theme.colors.white
+                      : theme.colors.textSecondary
+                  }
+                />
+                <Badge
+                  label="متاح اليوم"
+                  tone={availableTodayOnly ? 'info' : 'neutral'}
+                />
+              </TouchableOpacity>
+
+              {/* Clear-all button — visible when any filter is active */}
+              {activeFiltersCount > 0 && (
+                <TouchableOpacity
+                  style={styles.clearChip}
+                  onPress={handleClearFilters}
+                  accessibilityRole="button"
+                  accessibilityLabel="إزالة الفلترة"
+                >
+                  <Ionicons
+                    name="close-circle"
+                    size={16}
+                    color={theme.colors.danger}
+                  />
+                  <Text style={styles.clearChipText}>إزالة</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+        </View>
+      </View>
+
+      <View style={styles.resultsInfo}>
+        <Badge
+          label={`${doctors.length} ${
+            doctors.length === 1 ? 'طبيب' : 'أطباء'
+          }`}
+          tone={activeFiltersCount > 0 ? 'info' : 'neutral'}
+          icon="list-outline"
+        />
+        {activeFiltersCount > 0 ? (
           <TouchableOpacity
-            style={styles.clearChip}
+            style={styles.clearFiltersButton}
             onPress={handleClearFilters}
             accessibilityRole="button"
             accessibilityLabel="إزالة الفلترة"
           >
-            <Ionicons
-              name="close-circle"
-              size={16}
-              color={theme.colors.danger}
-            />
-            <Text style={styles.clearChipText}>إزالة</Text>
+            <Text style={styles.clearChipText}>إزالة الفلاتر</Text>
           </TouchableOpacity>
-        )}
-      </ScrollView>
+        ) : null}
+      </View>
+    </>
+  );
 
-      {/* Results count summary */}
-      {dataSource && (
-        <View style={styles.resultsInfo}>
-          <Text style={styles.resultsCount}>
-            {filteredDoctors.length}{' '}
-            {filteredDoctors.length === 1 ? 'طبيب' : 'أطباء'}
-          </Text>
-        </View>
-      )}
-
-      {/* Results list or empty state */}
-      {filteredDoctors.length > 0 ? (
+  // ── Main render ───────────────────────────────────────────────────────────
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      {dataSource ? (
         <FlatList
-          data={filteredDoctors}
+          data={doctors}
           renderItem={renderDoctor}
           keyExtractor={keyExtractor}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          ListHeaderComponent={searchListHeader}
+          ListEmptyComponent={
+            !isLoading ? (
+              <View style={styles.emptyWrapper}>
+                <EmptyState
+                  icon="search-outline"
+                  title="لا يوجد أطباء مطابقين لبحثك"
+                  subtitle="حاول تغيير كلمات البحث أو تصفح التخصصات من الصفحة الرئيسية"
+                />
+              </View>
+            ) : null
+          }
+          onScroll={handleResultsScroll}
+          scrollEventThrottle={16}
           // Load more when nearing the end
           onEndReached={() => {
             if (listStatus === 'CanLoadMore') {
@@ -580,14 +660,6 @@ export default function PatientSearchScreen() {
           onEndReachedThreshold={0.5}
           ItemSeparatorComponent={ItemSeparator}
         />
-      ) : !isLoading ? (
-        <View style={styles.emptyWrapper}>
-          <EmptyState
-            icon="🔍"
-            title="لا يوجد أطباء مطابقين لبحثك"
-            subtitle="حاول تغيير كلمات البحث أو تصفح التخصصات من الصفحة الرئيسية"
-          />
-        </View>
       ) : null}
 
       {/* Dropdowns */}
@@ -661,7 +733,10 @@ export default function PatientSearchScreen() {
 
               <TouchableOpacity
                 style={styles.filterPanelRow}
-                onPress={handleGenderToggle}
+                onPress={() => {
+                  setFilterModalVisible(false);
+                  setShowGenderPicker(true);
+                }}
                 accessibilityRole="button"
                 accessibilityLabel="تصفية حسب الجنس"
               >
@@ -688,22 +763,21 @@ export default function PatientSearchScreen() {
               </TouchableOpacity>
 
               <View style={styles.filterPanelActions}>
-                <TouchableOpacity
-                  style={styles.filterPanelSecondaryButton}
+                <Button
+                  label="إزالة"
+                  variant="secondary"
+                  icon="close-circle-outline"
                   onPress={handleClearFilters}
-                  accessibilityRole="button"
                   accessibilityLabel="إزالة الفلترة"
-                >
-                  <Text style={styles.filterPanelSecondaryText}>إزالة</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.filterPanelPrimaryButton}
+                  style={styles.filterPanelButton}
+                />
+                <Button
+                  label="تطبيق"
+                  icon="checkmark-circle-outline"
                   onPress={() => setFilterModalVisible(false)}
-                  accessibilityRole="button"
                   accessibilityLabel="تطبيق الفلاتر"
-                >
-                  <Text style={styles.filterPanelPrimaryText}>تطبيق</Text>
-                </TouchableOpacity>
+                  style={styles.filterPanelButton}
+                />
               </View>
             </View>
           </View>
@@ -727,6 +801,15 @@ export default function PatientSearchScreen() {
         onSelect={handleWilayaSelect}
         onClose={() => setShowWilayaPicker(false)}
       />
+
+      <DropdownPicker
+        visible={showGenderPicker}
+        title="اختر الجنس"
+        options={genderOptions}
+        selectedValue={genderFilter}
+        onSelect={handleGenderSelect}
+        onClose={() => setShowGenderPicker(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -740,56 +823,126 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: theme.colors.background,
-    writingDirection: 'rtl',
   },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
+
+  // ── Search header ───────────────────────────────────────────────────────────
+  searchHeader: {
+    paddingHorizontal: theme.spacing.lg,
+    paddingTop: theme.spacing.lg,
+    paddingBottom: theme.spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: theme.colors.border,
+    backgroundColor: theme.colors.background,
+  },
+  headerMeta: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: theme.spacing.md,
+    marginBottom: theme.spacing.md,
+  },
+  headerIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.surfaceMuted,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
     alignItems: 'center',
-    paddingHorizontal: theme.spacing['3xl'],
+    justifyContent: 'center',
+    marginTop: 2,
   },
-
-  // ── Loading ─────────────────────────────────────────────────────────────────
-  loadingText: {
+  headerCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  headerEyebrow: {
+    fontFamily: theme.typography.fontFamily.arabicBold,
+    fontSize: 12,
+    color: theme.colors.textMuted,
+    textAlign: rtlTextAlign(),
+    marginBottom: theme.spacing.xs,
+  },
+  headerTitle: {
+    fontFamily: theme.typography.fontFamily.arabicBold,
+    fontSize: 24,
+    lineHeight: 32,
+    color: theme.colors.textPrimary,
+    textAlign: rtlTextAlign(),
+  },
+  headerSubtitle: {
     fontFamily: theme.typography.fontFamily.arabic,
-    fontSize: 14,
+    fontSize: 13,
+    lineHeight: 21,
     color: theme.colors.textSecondary,
-    marginTop: theme.spacing.md,
-  },
-
-  // ── Filter chips ────────────────────────────────────────────────────────────
-  chipsRow: {
-    maxHeight: 48,
+    textAlign: rtlTextAlign(),
     marginTop: theme.spacing.xs,
   },
-  chipsContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: theme.spacing.lg,
+  searchControls: {
+    backgroundColor: theme.colors.surfaceRaised,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.lg,
+    padding: theme.spacing.sm,
     gap: theme.spacing.sm,
+  },
+  searchBarEmbedded: {
+    flexDirection: 'row-reverse',
+    marginHorizontal: 0,
+    marginVertical: 0,
+    backgroundColor: theme.colors.background,
+  },
+  chipsContent: {
+    flexDirection: 'row-reverse',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: theme.spacing.xs,
+  },
+  collapsedFiltersButton: {
+    minHeight: 38,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: theme.spacing.md,
+    backgroundColor: theme.colors.surfaceRaised,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.md,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+  },
+  collapsedFiltersCopy: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: theme.spacing.xs,
+  },
+  collapsedFiltersText: {
+    fontFamily: theme.typography.fontFamily.arabicBold,
+    fontSize: 13,
+    color: theme.colors.official,
+    textAlign: rtlTextAlign(),
+  },
+  collapsedFiltersMeta: {
+    fontFamily: theme.typography.fontFamily.arabic,
+    fontSize: 12,
+    color: theme.colors.textMuted,
   },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.colors.white,
+    minHeight: 38,
+    flexGrow: 1,
+    justifyContent: 'center',
+    backgroundColor: theme.colors.surfaceRaised,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.xl,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.md,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
     gap: theme.spacing.xs,
   },
   chipActive: {
     backgroundColor: theme.colors.primary,
     borderColor: theme.colors.primary,
-  },
-  chipText: {
-    fontFamily: theme.typography.fontFamily.arabic,
-    fontSize: 13,
-    color: theme.colors.textSecondary,
-  },
-  chipTextActive: {
-    color: theme.colors.white,
   },
   clearChip: {
     flexDirection: 'row',
@@ -808,18 +961,20 @@ const styles = StyleSheet.create({
   resultsInfo: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: theme.spacing.md,
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.sm,
   },
-  resultsCount: {
-    fontFamily: theme.typography.fontFamily.arabic,
-    fontSize: 13,
-    color: theme.colors.textSecondary,
-    textAlign: rtlTextAlign(),
+  clearFiltersButton: {
+    minHeight: 32,
+    justifyContent: 'center',
+    paddingHorizontal: theme.spacing.sm,
   },
 
   // ── List ────────────────────────────────────────────────────────────────────
   listContent: {
+    flexGrow: 1,
     paddingBottom: theme.spacing['4xl'],
   },
   separator: {
@@ -914,31 +1069,7 @@ const styles = StyleSheet.create({
     gap: theme.spacing.md,
     paddingTop: theme.spacing.lg,
   },
-  filterPanelPrimaryButton: {
+  filterPanelButton: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.colors.primary,
-    borderRadius: theme.borderRadius.md,
-    paddingVertical: theme.spacing.md,
-  },
-  filterPanelPrimaryText: {
-    fontFamily: theme.typography.fontFamily.arabicBold,
-    fontSize: 14,
-    color: theme.colors.white,
-  },
-  filterPanelSecondaryButton: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: theme.borderRadius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    paddingVertical: theme.spacing.md,
-  },
-  filterPanelSecondaryText: {
-    fontFamily: theme.typography.fontFamily.arabicBold,
-    fontSize: 14,
-    color: theme.colors.textSecondary,
   },
 });

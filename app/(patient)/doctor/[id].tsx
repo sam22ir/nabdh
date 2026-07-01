@@ -4,7 +4,7 @@
 // Displays full doctor profile with clinics, reviews, and booking CTA.
 // =============================================================================
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -752,6 +752,14 @@ export default function DoctorProfileScreen() {
   );
   const me = useQuery(api.users.me, {});
   const toggleFavorite = useMutation(api.doctors.toggleFavorite);
+  const [favoriteOverride, setFavoriteOverride] = useState<boolean | null>(null);
+  const isFavorite = favoriteOverride ?? isFavoriteRaw === true;
+
+  useEffect(() => {
+    if (isFavoriteRaw !== undefined) {
+      setFavoriteOverride(null);
+    }
+  }, [isFavoriteRaw]);
 
   const handleToggleFavorite = useCallback(async () => {
     if (!id || isTogglingFavorite) return;
@@ -766,15 +774,20 @@ export default function DoctorProfileScreen() {
     }
 
     setIsTogglingFavorite(true);
+    const previousFavorite = isFavoriteRaw === true;
     try {
       const result = await toggleFavorite({ doctorId: id as Id<'doctors'> });
       if (!result.ok && result.error === 'patient_profile_missing') {
+        setFavoriteOverride(previousFavorite);
         Alert.alert(
           'أكمل ملفك الطبي',
           'يرجى إكمال ملفك الطبي قبل إضافة الطبيب إلى المفضلة.',
         );
+        return;
       }
+      setFavoriteOverride(result.isFavorite);
     } catch (error) {
+      setFavoriteOverride(previousFavorite);
       Alert.alert(
         'تعذر تحديث المفضلة',
         getArabicErrorMessage(
@@ -785,7 +798,7 @@ export default function DoctorProfileScreen() {
     } finally {
       setIsTogglingFavorite(false);
     }
-  }, [id, isTogglingFavorite, me, toggleFavorite]);
+  }, [id, isFavoriteRaw, isTogglingFavorite, me, toggleFavorite]);
 
   // ── Clinic schedules for all of this doctor's clinics ─────────────────────
   const schedulesRaw = useQuery(
@@ -877,7 +890,7 @@ export default function DoctorProfileScreen() {
           avgRating={avgRating}
           totalReviews={totalReviews}
           isVerified={doctor.isVerified}
-          isFavorite={isFavoriteRaw === true}
+          isFavorite={isFavorite}
           isFavoriteLoading={
             isFavoriteRaw === undefined || me === undefined || isTogglingFavorite
           }

@@ -3,7 +3,7 @@
 // Route: /(patient)/booking/confirm
 // Shows a summary card (doctor, specialty, clinic + address, date, time),
 // visit type selector, optional reason + note inputs, price, and confirm
-// button.  Calls api.bookings.create on confirm.
+// button. Calls api.bookings.create or api.bookings.reschedule on confirm.
 // RTL layout – Arabic‑first.
 // =============================================================================
 
@@ -328,12 +328,14 @@ export default function BookingConfirmScreen() {
     date?: string | string[];
     time?: string | string[];
     profileId?: string | string[];
+    rescheduleBookingId?: string | string[];
   }>();
   const doctorId = routeParamString(params.doctorId);
   const clinicId = routeParamString(params.clinicId);
   const date = routeParamString(params.date);
   const time = routeParamString(params.time);
   const profileId = routeParamString(params.profileId);
+  const rescheduleBookingId = routeParamString(params.rescheduleBookingId);
   const hasValidBookingParams =
     Boolean(doctorId && clinicId) && isIsoDateParam(date) && isTimeParam(time);
   const me = useQuery(api.users.me, {});
@@ -366,6 +368,7 @@ export default function BookingConfirmScreen() {
 
   // ── Confirm mutation via Convex ──────────────────────────────────────────
   const createBooking = useMutation(api.bookings.create);
+  const rescheduleBooking = useMutation(api.bookings.reschedule);
 
   // ── Handlers ─────────────────────────────────────────────────────────────
   const handleBack = useCallback(() => {
@@ -395,16 +398,23 @@ export default function BookingConfirmScreen() {
 
     setIsCreating(true);
     try {
-      const bookingId = await createBooking({
-        clinicId: clinicId as Id<'clinics'>,
-        doctorId: doctorId as Id<'doctors'>,
-        appointmentDate: date,
-        appointmentTime: time,
-        visitType: visitType,
-        reason: reason || undefined,
-        patientNote: note || undefined,
-        profileId: profileId ? (profileId as Id<'patientProfiles'>) : undefined,
-      });
+      const bookingId = rescheduleBookingId
+        ? await rescheduleBooking({
+            bookingId: rescheduleBookingId as Id<'bookings'>,
+            newDate: date,
+            newTime: time,
+            reason: reason.trim() || undefined,
+          })
+        : await createBooking({
+            clinicId: clinicId as Id<'clinics'>,
+            doctorId: doctorId as Id<'doctors'>,
+            appointmentDate: date,
+            appointmentTime: time,
+            visitType: visitType,
+            reason: reason || undefined,
+            patientNote: note || undefined,
+            profileId: profileId ? (profileId as Id<'patientProfiles'>) : undefined,
+          });
 
       // Navigate to success screen
       router.replace({
@@ -460,10 +470,12 @@ export default function BookingConfirmScreen() {
     reason,
     note,
     profileId,
+    rescheduleBookingId,
     doctor,
     clinic,
     router,
     createBooking,
+    rescheduleBooking,
   ]);
 
   // ── Loading state ────────────────────────────────────────────────────────

@@ -1,6 +1,8 @@
 import { useCallback } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { Badge, Panel, TrustRow } from '@/components/ui';
 import { theme } from '../lib/theme';
+import { rtlTextAlign } from '../lib/rtl';
 import type { Appointment, AppointmentStatus } from '../lib/types';
 
 // =============================================================================
@@ -19,27 +21,23 @@ const ARABIC_DAYS: readonly string[] = [
 
 const STATUS_CONFIG: Record<
   AppointmentStatus,
-  { label: string; color: string; backgroundColor: string }
+  { label: string; tone: 'success' | 'danger' | 'warning' | 'neutral' }
 > = {
   confirmed: {
     label: 'مؤكد',
-    color: theme.colors.success,
-    backgroundColor: '#E8F8EE',
+    tone: 'success',
   },
   cancelled: {
     label: 'ملغى',
-    color: theme.colors.danger,
-    backgroundColor: '#FDEDEC',
+    tone: 'danger',
   },
   completed: {
     label: 'مكتمل',
-    color: theme.colors.textSecondary,
-    backgroundColor: '#F3F4F6',
+    tone: 'neutral',
   },
   no_show: {
     label: 'لم يحضر',
-    color: theme.colors.warning,
-    backgroundColor: '#FEF3CD',
+    tone: 'warning',
   },
 };
 
@@ -116,22 +114,13 @@ export default function AppointmentCard({
   // ── Render ──────────────────────────────────────────────────────────────
 
   const cardContent = (
-    <>
+    <Panel style={styles.panel}>
       {/* Header: Doctor name + status badge */}
       <View style={styles.header}>
         <Text style={styles.doctorName} numberOfLines={1}>
           د. {doctorName}
         </Text>
-        <View
-          style={[
-            styles.badge,
-            { backgroundColor: statusCfg.backgroundColor },
-          ]}
-        >
-          <Text style={[styles.badgeText, { color: statusCfg.color }]}>
-            {statusCfg.label}
-          </Text>
-        </View>
+        <Badge label={statusCfg.label} tone={statusCfg.tone} />
       </View>
 
       {/* Specialty */}
@@ -139,22 +128,22 @@ export default function AppointmentCard({
         {specialty}
       </Text>
 
-      {/* Clinic */}
-      <View style={styles.infoRow}>
-        <Text style={styles.infoLabel}>العيادة: </Text>
-        <Text style={styles.infoValue} numberOfLines={1}>
-          {clinicName}
-        </Text>
-      </View>
-
-      {/* Date & time */}
-      <View style={styles.infoRow}>
-        <Text style={styles.infoLabel}>التاريخ: </Text>
-        <Text style={styles.infoValue}>{formatArabicDate(appointmentDate)}</Text>
-      </View>
-      <View style={styles.infoRow}>
-        <Text style={styles.infoLabel}>الوقت: </Text>
-        <Text style={styles.infoValue}>{appointmentTime}</Text>
+      <View style={styles.details}>
+        <TrustRow
+          icon="business-outline"
+          label="العيادة"
+          value={clinicName}
+        />
+        <TrustRow
+          icon="calendar-outline"
+          label="التاريخ"
+          value={formatArabicDate(appointmentDate)}
+        />
+        <TrustRow
+          icon="time-outline"
+          label="الوقت"
+          value={appointmentTime}
+        />
       </View>
 
       {/* Action buttons */}
@@ -228,7 +217,7 @@ export default function AppointmentCard({
           )}
         </View>
       )}
-    </>
+    </Panel>
   );
 
   if (showActions) {
@@ -253,17 +242,16 @@ export default function AppointmentCard({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: theme.colors.white,
-    borderRadius: theme.borderRadius.lg,
-    padding: theme.spacing.lg,
     marginHorizontal: theme.spacing.lg,
     marginBottom: theme.spacing.md,
-    ...theme.shadows.md,
-    writingDirection: 'rtl',
   },
 
   cardPressed: {
     opacity: 0.9,
+  },
+
+  panel: {
+    gap: theme.spacing.sm,
   },
 
   // ─── Header ────────────────────────────────────────────────────────────
@@ -283,43 +271,18 @@ const styles = StyleSheet.create({
     marginEnd: theme.spacing.sm,
   },
 
-  badge: {
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.xs,
-    borderRadius: theme.borderRadius.sm,
-  },
-
-  badgeText: {
-    fontFamily: theme.typography.fontFamily.arabicBold,
-    fontSize: 12,
-  },
-
   // ─── Info rows ─────────────────────────────────────────────────────────
 
   specialty: {
     fontFamily: theme.typography.fontFamily.arabic,
     fontSize: 14,
     color: theme.colors.primary,
-    marginBottom: theme.spacing.xs,
+    textAlign: rtlTextAlign(),
   },
 
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: theme.spacing.xs,
-  },
-
-  infoLabel: {
-    fontFamily: theme.typography.fontFamily.arabic,
-    fontSize: 13,
-    color: theme.colors.textSecondary,
-  },
-
-  infoValue: {
-    flex: 1,
-    fontFamily: theme.typography.fontFamily.arabic,
-    fontSize: 13,
-    color: theme.colors.textPrimary,
+  details: {
+    gap: theme.spacing.sm,
+    paddingTop: theme.spacing.sm,
   },
 
   // ─── Actions ───────────────────────────────────────────────────────────

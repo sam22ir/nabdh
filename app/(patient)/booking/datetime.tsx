@@ -23,6 +23,12 @@ import { useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { theme } from '@/lib/theme';
 import { routeParamString } from '@/lib/routeParams';
+import {
+  formatBookingDateStr,
+  formatGregorianArabicMonthShort,
+  generateAlgeriaDateRange,
+  selectInitialBookingDate,
+} from '@/lib/bookingDates';
 import type { Id } from '@/convex/_generated/dataModel';
 
 // =============================================================================
@@ -70,23 +76,6 @@ const DAY_NAMES_FULL = ['الأحد', 'الإثنين', 'الثلاثاء', 'ا�
 // =============================================================================
 // Helpers
 // =============================================================================
-
-/** YYYY-MM-DD from a Date object. */
-function formatDateStr(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
-/** Generate the next N dates (including today). */
-function generateDateRange(days: number): Date[] {
-  const dates: Date[] = [];
-  const today = new Date();
-  for (let i = 0; i < days; i++) {
-    const d = new Date(today);
-    d.setDate(today.getDate() + i);
-    dates.push(d);
-  }
-  return dates;
-}
 
 // =============================================================================
 // Data-fetching hooks
@@ -366,9 +355,11 @@ export default function BookingDateTimeScreen() {
     useLocalSearchParams<{
       doctorId?: string | string[];
       clinicId?: string | string[];
+      rescheduleBookingId?: string | string[];
     }>();
   const doctorId = routeParamString(params.doctorId);
   const clinicId = routeParamString(params.clinicId);
+  const rescheduleBookingId = routeParamString(params.rescheduleBookingId);
 
   // ── Local state ──────────────────────────────────────────────────────────
   const [selectedDateStr, setSelectedDateStr] = useState<string>('');
@@ -404,16 +395,16 @@ export default function BookingDateTimeScreen() {
 
   // ── Derived data: build DayData[] for the 14 days ───────────────────────
   const dateRange = useMemo(() => {
-    const dates = generateDateRange(DAYS_TO_SHOW);
+    const dates = generateAlgeriaDateRange(DAYS_TO_SHOW);
     return { all: dates };
   }, []);
 
   const days: DayData[] = useMemo(() => {
-    const todayStr = formatDateStr(new Date());
+    const todayStr = formatBookingDateStr(dateRange.all[0]);
 
     return dateRange.all.map((date) => {
-      const dateStr = formatDateStr(date);
-      const dow = date.getDay();
+      const dateStr = formatBookingDateStr(date);
+      const dow = date.getUTCDay();
 
       // Check if any active schedule exists for this day-of-week
       const hasSchedule = schedules.some(
@@ -423,18 +414,19 @@ export default function BookingDateTimeScreen() {
       return {
         dateStr,
         dayName: DAY_NAMES_SHORT[dow],
-        dayNumber: date.getDate(),
-        monthName: date.toLocaleDateString('ar-SA', { month: 'short' }),
+        dayNumber: date.getUTCDate(),
+        monthName: formatGregorianArabicMonthShort(date),
         isToday: dateStr === todayStr,
         hasAvailability: hasSchedule,
       };
     });
   }, [dateRange, schedules]);
 
-  // Auto‑select today on first load if it has availability
+  // Auto-select the earliest visible date that has an active schedule.
   useEffect(() => {
-    if (!selectedDateStr && days.length > 0) {
-      setSelectedDateStr(days[0].dateStr);
+    const initialDate = selectInitialBookingDate(days);
+    if (!selectedDateStr && initialDate) {
+      setSelectedDateStr(initialDate);
     }
   }, [days, selectedDateStr]);
 
@@ -466,9 +458,17 @@ export default function BookingDateTimeScreen() {
         clinicId,
         date: selectedDateStr,
         time: selectedSlot,
+        rescheduleBookingId,
       },
     } as any);
-  }, [router, doctorId, clinicId, selectedDateStr, selectedSlot]);
+  }, [
+    router,
+    doctorId,
+    clinicId,
+    selectedDateStr,
+    selectedSlot,
+    rescheduleBookingId,
+  ]);
 
   const handleBack = useCallback(() => {
     router.back();
