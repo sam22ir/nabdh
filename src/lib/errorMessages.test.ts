@@ -17,4 +17,10 @@ describe("getArabicErrorMessage", () => {
       getArabicErrorMessage(new Error("Request ID abc Server Error"), "حدث خطأ"),
     ).toBe("حدث خطأ");
   });
+
+  test("maps timeout errors to a retryable connection message", () => {
+    expect(
+      getArabicErrorMessage(new Error("profile_completion_timeout"), "حدث خطأ"),
+    ).toBe("تعذر الاتصال بالخادم. تحقق من اتصالك ثم حاول مرة أخرى.");
+  });
 });

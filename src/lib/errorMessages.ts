@@ -32,7 +32,9 @@ export function getArabicErrorMessage(
   if (
     rawMessage.includes('network') ||
     rawMessage.includes('websocket') ||
-    rawMessage.includes('failed to fetch')
+    rawMessage.includes('failed to fetch') ||
+    rawMessage.includes('timeout') ||
+    rawMessage.includes('timed out')
   ) {
     return 'تعذر الاتصال بالخادم. تحقق من اتصالك ثم حاول مرة أخرى.';
   }

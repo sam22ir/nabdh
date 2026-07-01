@@ -1,5 +1,6 @@
 import { v } from "convex/values";
-import { query, mutation, internalMutation } from "./_generated/server";
+import { query, mutation, internalMutation, internalQuery } from "./_generated/server";
+import { internal } from "./_generated/api";
 import {
   paginationOptsValidator,
   paginationResultValidator,
@@ -20,6 +21,11 @@ const notificationFields = {
   data: v.optional(v.any()),
   isRead: v.boolean(),
 } as const;
+
+const pushDeliveryStatusValidator = v.union(
+  v.literal("pending"),
+  v.literal("skipped"),
+);
 
 const paginatedNotificationsValidator = paginationResultValidator(
   v.object(notificationFields),
@@ -139,6 +145,16 @@ export const registerPushToken = mutation({
         q.eq("userId", userId).eq("token", args.token),
       )
       .unique();
+    const existingForToken = await ctx.db
+      .query("pushTokens")
+      .withIndex("by_token", (q) => q.eq("token", args.token))
+      .collect();
+
+    for (const token of existingForToken) {
+      if (token._id !== existing?._id) {
+        await ctx.db.delete(token._id);
+      }
+    }
 
     if (existing) {
       if (existing.platform !== args.platform) {
@@ -202,9 +218,12 @@ export const create = internalMutation({
     body: v.string(),
     data: v.optional(v.any()),
   },
-  returns: v.id("notifications"),
+  returns: v.object({
+    notificationId: v.id("notifications"),
+    deliveryStatus: pushDeliveryStatusValidator,
+  }),
   handler: async (ctx, args) => {
-    return await ctx.db.insert("notifications", {
+    const notificationId = await ctx.db.insert("notifications", {
       userId: args.userId,
       type: args.type,
       title: args.title,
@@ -212,6 +231,41 @@ export const create = internalMutation({
       data: args.data,
       isRead: false,
     });
+
+    await ctx.scheduler.runAfter(
+      0,
+      internal.pushDelivery.deliverNotification,
+      { notificationId },
+    );
+
+    return { notificationId, deliveryStatus: "pending" as const };
+  },
+});
+
+export const getForDelivery = internalQuery({
+  args: { notificationId: v.id("notifications") },
+  returns: v.union(v.object(notificationFields), v.null()),
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.notificationId);
+  },
+});
+
+export const listPushTokensForUser = internalQuery({
+  args: { userId: v.id("users") },
+  returns: v.array(
+    v.object({
+      _id: v.id("pushTokens"),
+      _creationTime: v.number(),
+      userId: v.id("users"),
+      token: v.string(),
+      platform: v.union(v.literal("android"), v.literal("ios")),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("pushTokens")
+      .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+      .collect();
   },
 });
 
