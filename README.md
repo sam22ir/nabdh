@@ -1,99 +1,140 @@
-# Nabdh
+# Nabdh | نبض
 
-Nabdh is an Expo SDK 56 React Native app for medical appointment booking in Algeria.
-It uses Expo Router, Convex backend, Clerk authentication, and an Arabic-first RTL UI.
+Nabdh is an Arabic-first mobile app for finding and managing medical appointments in Algeria. It brings patients, doctors, and clinics into one scheduling flow built around real clinic availability.
 
-## Requirements
+The app is built with Expo and React Native, and is currently under active development.
+
+## What Nabdh Does
+
+### For patients
+
+- Discover doctors and clinics by specialty and location.
+- Review doctor profiles, clinic details, availability, and patient reviews.
+- Book an appointment through a clinic: choose the clinic, doctor, date, and time.
+- Track upcoming, past, and cancelled appointments.
+- Save favorite doctors and receive in-app appointment updates.
+
+### For doctors
+
+- Build a professional profile and join a clinic through an invitation or request workflow.
+- Manage clinic-specific schedules and availability exceptions.
+- View daily, weekly, and monthly appointment worklists.
+- Update appointment states, add doctor notes, and review appointment history.
+- Control booking and notification preferences.
+
+### For clinics
+
+- Create a public clinic profile with location and contact details.
+- Invite doctors, review incoming membership requests, and manage active members.
+- Configure clinic closures and doctor schedules.
+- Manage appointments across the clinic and filter them by doctor or status.
+
+## How Booking Works
+
+Appointments always belong to a clinic and a doctor. Nabdh checks the clinic's status, the doctor's accepted clinic membership, schedule exceptions, and existing bookings before offering a time slot.
+
+```text
+Patient -> Clinic -> Doctor -> Date and time -> Appointment confirmation
+```
+
+Doctors and clinics can each manage the appointment workflow once a doctor has an accepted clinic membership. If that membership ends, affected future appointments are cancelled and patients are notified.
+
+## Product Principles
+
+- Arabic-first, right-to-left experience designed for Algerian users.
+- Operational scheduling rather than a directory-only experience.
+- Clear roles and permissions for patients, doctors, and clinics.
+- Calm, mobile-focused interface using Cairo and Inter typography.
+
+## Technology
+
+| Area | Stack |
+| --- | --- |
+| Mobile app | Expo SDK 56, React Native, Expo Router |
+| Authentication | Clerk |
+| Backend and real-time data | Convex |
+| Forms and validation | React Hook Form, Zod |
+| Notifications | Expo Notifications and Convex actions |
+| Monitoring | Sentry |
+| Testing | Vitest and TypeScript |
+
+## Project Structure
+
+```text
+app/        Expo Router screens for auth, patient, doctor, and clinic flows
+convex/     Convex schema, queries, mutations, scheduled jobs, and tests
+src/        Shared UI components, state, validation, and app utilities
+assets/     Application icons, splash assets, and bundled fonts
+```
+
+## Getting Started
+
+### Prerequisites
 
 - Node.js and npm
-- Expo CLI through `npx expo`
-- Convex CLI through `npx convex`
+- An Expo-compatible Android, iOS, or web environment
+- A Convex project
+- A Clerk application
 
-## Setup
-
-1. Install dependencies:
+### Install and configure
 
 ```bash
 npm install
-```
-
-2. Create local environment files from the template:
-
-```bash
 cp .env.example .env.local
 ```
 
-3. Configure Convex:
+Set the values in `.env.local` for your Convex deployment, Convex URL, and Clerk publishable key. Configure the Clerk issuer in Convex as well:
 
 ```bash
+npx convex env set CLERK_JWT_ISSUER_DOMAIN <your-clerk-frontend-api-url>
 npx convex dev
 ```
 
-Keep `npx convex dev` running while developing so generated Convex APIs and backend functions stay current.
+Keep `npx convex dev` running during local development so the generated Convex API stays in sync.
 
-## Environment
-
-Required variables are documented in `.env.example`.
-
-- `CONVEX_DEPLOYMENT`: Convex deployment name for local development.
-- `EXPO_PUBLIC_CONVEX_URL`: public Convex deployment URL consumed by the Expo client.
-- `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY`: Clerk publishable key consumed by the Expo client.
-- `CLERK_JWT_ISSUER_DOMAIN`: Clerk Frontend API URL from the Clerk Convex integration page. Set it in Convex with `npx convex env set CLERK_JWT_ISSUER_DOMAIN <url>`.
-
-Local secret files such as `.env`, `.env.local`, and `.env*.local` are ignored by git.
-
-## Development
-
-Run the app:
+### Run the app
 
 ```bash
 npm run web
 ```
 
-Other targets:
+For native development:
 
 ```bash
 npm run android
 npm run ios
 ```
 
-## Seed Data
+## Environment Variables
 
-The active mock/demo dataset lives in Convex, not Supabase. The internal seed mutation is:
+The complete local template is in [`.env.example`](.env.example).
 
-```text
-internal.seed.seed
-```
+| Variable | Purpose |
+| --- | --- |
+| `CONVEX_DEPLOYMENT` | Convex deployment used by the local CLI |
+| `EXPO_PUBLIC_CONVEX_URL` | Public Convex URL used by the Expo app |
+| `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk key used by the Expo app |
+| `CLERK_JWT_ISSUER_DOMAIN` | Clerk issuer configured in Convex |
+| `EXPO_PUBLIC_SENTRY_DSN` | Optional client-side Sentry DSN |
 
-Run it from the Convex dashboard or with an authenticated Convex dev workflow. It seeds wilayas, communes, specialties, demo doctors, clinics, schedules, appointments, reviews, and favorites.
+Never commit real credentials. `.env`, `.env.local`, and other local environment files are ignored by Git.
 
-## Verification
+## Development Data
 
-Run the test suite:
+The demo data lives in Convex. The internal seed mutation is `internal.seed.seed`; run it from the Convex dashboard or through an authenticated Convex development workflow. It creates sample locations, specialties, clinics, doctors, schedules, appointments, reviews, and favorites.
+
+## Quality Checks
 
 ```bash
 npm test
-```
-
-Run TypeScript:
-
-```bash
 npm run typecheck
-```
-
-Run Expo project checks:
-
-```bash
 npx expo-doctor
 ```
 
-## Push Notifications
+## Notifications
 
-In-app notification rows are stored in Convex. Remote push delivery uses `expo-notifications`, Expo push tokens, and the Convex `pushDelivery` internal action.
+Nabdh stores in-app notifications in Convex and can deliver remote notifications through Expo push tokens. On Android with Expo SDK 56, remote push notifications require a development or production build; Expo Go does not support this delivery path.
 
-For Expo SDK 56, Android push notifications require a development build or production build; Expo Go on Android does not support remote push. Configure EAS project credentials before validating device delivery. Expo web remains a no-op for push registration.
+## Backend
 
-## Backend Status
-
-Convex backend is the active backend for data, auth, scheduling, bookings, reviews, and notifications.
-Supabase files are legacy reference only and should not be deployed for this app.
+Convex is the active backend for authentication integration, scheduling, appointments, clinic membership, reviews, favorites, and notifications. Supabase-related files are retained only as legacy reference and should not be deployed for Nabdh.
