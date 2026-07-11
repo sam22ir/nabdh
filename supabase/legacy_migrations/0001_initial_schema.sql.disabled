@@ -1,0 +1,668 @@
+-- 0001_initial_schema.sql
+-- LEGACY REFERENCE ONLY - DO NOT APPLY.
+-- The active Nabdh backend is Convex. This historical Supabase draft contains
+-- permissive RLS policies and is archived outside supabase/migrations so the
+-- Supabase CLI will not deploy it accidentally.
+-- Nabdh Database Schema — Initial Migration
+-- Creates all core tables, indexes, RLS policies, and triggers.
+-- PostgreSQL / Supabase dialect.
+
+-- #############################################################################
+-- 0. EXTENSIONS
+-- #############################################################################
+create extension if not exists "uuid-ossp";
+create extension if not exists "pg_trgm";
+
+-- #############################################################################
+-- 1. CUSTOM TYPES (created before any table reference)
+-- #############################################################################
+create type booking_visit_type as enum ('in_person', 'video', 'phone');
+create type booking_status as enum ('pending', 'confirmed', 'completed', 'cancelled', 'no_show');
+create type cancelled_by_actor as enum ('patient', 'doctor', 'system');
+
+-- #############################################################################
+-- 2. USERS (extends auth.users)
+-- #############################################################################
+create table public.users (
+    id          uuid        primary key references auth.users(id) on delete cascade,
+    role        text        not null check (role in ('patient', 'doctor', 'clinic_admin', 'super_admin')),
+    phone       text        unique,
+    avatar_url  text,
+    created_at  timestamptz not null default now(),
+    updated_at  timestamptz not null default now()
+);
+
+-- #############################################################################
+-- 3. SPECIALTIES
+-- #############################################################################
+create table public.specialties (
+    id          bigint  generated always as identity primary key,
+    name_ar     text    not null,
+    name_fr     text    not null,
+    icon        text,
+    parent_id   bigint  references public.specialties(id) on delete set null
+);
+
+-- #############################################################################
+-- 4. WILAYAS (Algerian administrative divisions, IDs 1-58)
+-- #############################################################################
+create table public.wilayas (
+    id      smallint primary key check (id between 1 and 58),
+    name_ar text     not null,
+    name_fr text     not null
+);
+
+-- #############################################################################
+-- 5. COMMUNES
+-- #############################################################################
+create table public.communes (
+    id          bigint      generated always as identity primary key,
+    wilaya_id   smallint    not null references public.wilayas(id) on delete cascade,
+    name_ar     text        not null,
+    name_fr     text        not null
+);
+
+-- #############################################################################
+-- 6. DOCTORS (extends users)
+-- #############################################################################
+create table public.doctors (
+    id                  uuid            primary key references public.users(id) on delete cascade,
+    license_number      text            unique,
+    specialty_id        bigint          references public.specialties(id) on delete set null,
+    specialty           text            , -- denormalized specialty name for full-text search
+    name_ar             text            ,
+    name_fr             text            ,
+    description         text            ,
+    education           text            ,
+    experience_years    smallint        check (experience_years >= 0),
+    is_verified         boolean         not null default false,
+    consultation_fee    numeric(10, 2)  check (consultation_fee >= 0),
+    search_vector       tsvector        generated always as (
+        to_tsvector('simple', coalesce(name_ar, '') || ' ' || coalesce(specialty, ''))
+    ) stored,
+    created_at          timestamptz     not null default now(),
+    updated_at          timestamptz     not null default now()
+);
+
+-- GIN index for Arabic full-text search on doctors name_ar and specialty
+create index idx_doctors_search_vector on public.doctors using gin (search_vector);
+
+-- #############################################################################
+-- 7. PATIENTS (extends users)
+-- #############################################################################
+create table public.patients (
+    id              uuid    primary key references public.users(id) on delete cascade,
+    date_of_birth   date,
+    gender          text    check (gender in ('male', 'female')),
+    blood_type      text    check (blood_type in ('A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'))
+);
+
+-- #############################################################################
+-- 8. PATIENT PROFILES (sub-profiles for family members)
+-- #############################################################################
+create table public.patient_profiles (
+    id              uuid        primary key default gen_random_uuid(),
+    parent_user_id  uuid        not null references public.users(id) on delete cascade,
+    full_name       text        not null,
+    date_of_birth   date,
+    gender          text        check (gender in ('male', 'female')),
+    blood_type      text        check (blood_type in ('A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-')),
+    relationship    text        ,
+    created_at      timestamptz not null default now(),
+    updated_at      timestamptz not null default now()
+);
+
+-- #############################################################################
+-- 9. CLINICS
+-- #############################################################################
+create table public.clinics (
+    id          uuid            primary key default gen_random_uuid(),
+    doctor_id   uuid            not null references public.doctors(id) on delete cascade,
+    name_ar     text            not null,
+    name_fr     text            not null,
+    address     text            not null,
+    latitude    numeric(9, 6)   ,
+    longitude   numeric(9, 6)   ,
+    wilaya_id   smallint        references public.wilayas(id) on delete set null,
+    commune_id  bigint          references public.communes(id) on delete set null,
+    phone       text            ,
+    is_active   boolean         not null default true,
+    created_at  timestamptz     not null default now(),
+    updated_at  timestamptz     not null default now()
+);
+
+-- #############################################################################
+-- 10. SCHEDULES
+-- #############################################################################
+create table public.schedules (
+    id                      uuid        primary key default gen_random_uuid(),
+    clinic_id               uuid        not null references public.clinics(id) on delete cascade,
+    day_of_week             smallint    not null check (day_of_week between 0 and 6),
+    start_time              time        not null,
+    end_time                time        not null check (end_time > start_time),
+    slot_duration_minutes   smallint    not null default 30 check (slot_duration_minutes > 0),
+    is_active               boolean     not null default true,
+    unique (clinic_id, day_of_week)
+);
+
+-- #############################################################################
+-- 11. SCHEDULE EXCEPTIONS
+-- #############################################################################
+create table public.schedule_exceptions (
+    id              uuid        primary key default gen_random_uuid(),
+    clinic_id       uuid        not null references public.clinics(id) on delete cascade,
+    exception_date  date        not null,
+    is_available    boolean     not null default false,
+    start_time      time        ,
+    end_time        time        check (end_time is null or start_time is not null),
+    reason          text        ,
+    unique (clinic_id, exception_date)
+);
+
+-- #############################################################################
+-- 12. BOOKINGS
+-- #############################################################################
+create table public.bookings (
+    id                uuid                primary key default gen_random_uuid(),
+    patient_id        uuid                not null references public.patients(id) on delete cascade,
+    doctor_id         uuid                not null references public.doctors(id) on delete cascade,
+    clinic_id         uuid                not null references public.clinics(id) on delete cascade,
+    profile_id        uuid                references public.patient_profiles(id) on delete set null,
+    booking_date      date                not null,
+    booking_time      time                not null,
+    duration_minutes  smallint            not null default 30 check (duration_minutes > 0),
+    visit_type        booking_visit_type  not null default 'in_person',
+    status            booking_status      not null default 'pending',
+    cancelled_by      cancelled_by_actor  ,
+    cancellation_reason text              ,
+    notes             text                ,
+    created_at        timestamptz         not null default now(),
+    updated_at        timestamptz         not null default now(),
+    unique (clinic_id, booking_date, booking_time)
+);
+
+-- #############################################################################
+-- 13. REVIEWS
+-- #############################################################################
+create table public.reviews (
+    id              uuid        primary key default gen_random_uuid(),
+    booking_id      uuid        not null unique references public.bookings(id) on delete cascade,
+    rating          smallint    not null check (rating between 1 and 5),
+    comment         text        ,
+    doctor_reply    text        ,
+    created_at      timestamptz not null default now(),
+    updated_at      timestamptz not null default now()
+);
+
+-- #############################################################################
+-- 14. NOTIFICATIONS
+-- #############################################################################
+create table public.notifications (
+    id          uuid        primary key default gen_random_uuid(),
+    user_id     uuid        not null references public.users(id) on delete cascade,
+    type        text        not null,
+    title       text        not null,
+    body        text        ,
+    data        jsonb       ,
+    is_read     boolean     not null default false,
+    created_at  timestamptz not null default now()
+);
+
+-- #############################################################################
+-- 15. PUSH TOKENS
+-- #############################################################################
+create table public.push_tokens (
+    id          uuid        primary key default gen_random_uuid(),
+    user_id     uuid        not null references public.users(id) on delete cascade,
+    token       text        not null,
+    platform    text        not null check (platform in ('ios', 'android', 'web')),
+    created_at  timestamptz not null default now(),
+    unique (user_id, token)
+);
+
+-- #############################################################################
+-- 16. PATIENT FAVORITES
+-- #############################################################################
+create table public.patient_favorites (
+    patient_id  uuid        not null references public.patients(id) on delete cascade,
+    doctor_id   uuid        not null references public.doctors(id) on delete cascade,
+    created_at  timestamptz not null default now(),
+    primary key (patient_id, doctor_id)
+);
+
+-- #############################################################################
+-- 17. ADDITIONAL INDEXES
+-- #############################################################################
+create index idx_bookings_patient_id      on public.bookings(patient_id);
+create index idx_bookings_doctor_id       on public.bookings(doctor_id);
+create index idx_bookings_clinic_id       on public.bookings(clinic_id);
+create index idx_bookings_date            on public.bookings(booking_date);
+create index idx_bookings_status          on public.bookings(status);
+create index idx_bookings_doctor_date     on public.bookings(doctor_id, booking_date);
+create index idx_clinics_doctor_id        on public.clinics(doctor_id);
+create index idx_clinics_wilaya_id        on public.clinics(wilaya_id);
+create index idx_clinics_location         on public.clinics(latitude, longitude);
+create index idx_schedules_clinic_id      on public.schedules(clinic_id);
+create index idx_schedule_exceptions_clinic_id on public.schedule_exceptions(clinic_id);
+create index idx_schedule_exceptions_date on public.schedule_exceptions(exception_date);
+create index idx_notifications_user_id    on public.notifications(user_id);
+create index idx_notifications_is_read    on public.notifications(is_read);
+create index idx_notifications_created    on public.notifications(created_at);
+create index idx_push_tokens_user_id      on public.push_tokens(user_id);
+create index idx_reviews_booking_id       on public.reviews(booking_id);
+create index idx_reviews_doctor           on public.reviews(booking_id);
+create index idx_patient_profiles_parent  on public.patient_profiles(parent_user_id);
+create index idx_communes_wilaya_id       on public.communes(wilaya_id);
+create index idx_specialties_parent       on public.specialties(parent_id);
+
+-- #############################################################################
+-- 18. TRIGGER: auto-update updated_at columns
+-- #############################################################################
+create or replace function public.set_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+    new.updated_at = now();
+    return new;
+end;
+$$;
+
+create trigger trg_users_updated_at
+    before update on public.users
+    for each row execute function public.set_updated_at();
+
+create trigger trg_doctors_updated_at
+    before update on public.doctors
+    for each row execute function public.set_updated_at();
+
+create trigger trg_patient_profiles_updated_at
+    before update on public.patient_profiles
+    for each row execute function public.set_updated_at();
+
+create trigger trg_clinics_updated_at
+    before update on public.clinics
+    for each row execute function public.set_updated_at();
+
+create trigger trg_bookings_updated_at
+    before update on public.bookings
+    for each row execute function public.set_updated_at();
+
+create trigger trg_reviews_updated_at
+    before update on public.reviews
+    for each row execute function public.set_updated_at();
+
+-- #############################################################################
+-- 19. ROW LEVEL SECURITY
+-- #############################################################################
+
+-- Helper: super_admin override function
+create or replace function public.is_super_admin()
+returns boolean
+language sql
+stable
+as $$
+    select exists (
+        select 1 from public.users
+        where id = auth.uid()
+          and role = 'super_admin'
+    );
+$$;
+
+-- Helper: check if user owns a patient record
+create or replace function public.is_patient_owner(patient_id uuid)
+returns boolean
+language sql
+stable
+as $$
+    select auth.uid() = patient_id;
+$$;
+
+-- Helper: check if user is the doctor for a given doctor_id
+create or replace function public.is_doctor_owner(doctor_id uuid)
+returns boolean
+language sql
+stable
+as $$
+    select auth.uid() = doctor_id;
+$$;
+
+-- Enable RLS on all tables
+alter table public.users              enable row level security;
+alter table public.patients           enable row level security;
+alter table public.doctors            enable row level security;
+alter table public.patient_profiles   enable row level security;
+alter table public.clinics            enable row level security;
+alter table public.schedules          enable row level security;
+alter table public.schedule_exceptions enable row level security;
+alter table public.bookings           enable row level security;
+alter table public.reviews            enable row level security;
+alter table public.specialties        enable row level security;
+alter table public.wilayas            enable row level security;
+alter table public.communes           enable row level security;
+alter table public.notifications      enable row level security;
+alter table public.push_tokens        enable row level security;
+alter table public.patient_favorites  enable row level security;
+
+-- #############################################################################
+-- 19a. RLS: USERS
+-- #############################################################################
+-- Patients read / update own data; super_admin full access
+create policy "users_select_own"
+    on public.users for select
+    using (auth.uid() = id or public.is_super_admin());
+
+create policy "users_insert_own"
+    on public.users for insert
+    with check (auth.uid() = id);
+
+create policy "users_update_own"
+    on public.users for update
+    using (auth.uid() = id or public.is_super_admin());
+
+-- #############################################################################
+-- 19b. RLS: PATIENTS
+-- #############################################################################
+-- Patients read own data; doctors/clinics may read during booking flow
+create policy "patients_select_own"
+    on public.patients for select
+    using (
+        auth.uid() = id
+        or public.is_super_admin()
+    );
+
+create policy "patients_insert_own"
+    on public.patients for insert
+    with check (auth.uid() = id);
+
+create policy "patients_update_own"
+    on public.patients for update
+    using (auth.uid() = id or public.is_super_admin());
+
+-- #############################################################################
+-- 19c. RLS: DOCTORS
+-- #############################################################################
+-- Verified doctors are publicly readable; own full access; super_admin full access
+create policy "doctors_select_verified_public"
+    on public.doctors for select
+    using (is_verified = true);
+
+create policy "doctors_select_own"
+    on public.doctors for select
+    using (auth.uid() = id or public.is_super_admin());
+
+create policy "doctors_insert_own"
+    on public.doctors for insert
+    with check (auth.uid() = id);
+
+create policy "doctors_update_own"
+    on public.doctors for update
+    using (auth.uid() = id or public.is_super_admin());
+
+-- #############################################################################
+-- 19d. RLS: PATIENT PROFILES
+-- #############################################################################
+-- Parent user (the account owner) has full CRUD; super_admin full access
+create policy "patient_profiles_select_parent"
+    on public.patient_profiles for select
+    using (auth.uid() = parent_user_id or public.is_super_admin());
+
+create policy "patient_profiles_insert_parent"
+    on public.patient_profiles for insert
+    with check (auth.uid() = parent_user_id);
+
+create policy "patient_profiles_update_parent"
+    on public.patient_profiles for update
+    using (auth.uid() = parent_user_id or public.is_super_admin());
+
+create policy "patient_profiles_delete_parent"
+    on public.patient_profiles for delete
+    using (auth.uid() = parent_user_id or public.is_super_admin());
+
+-- #############################################################################
+-- 19e. RLS: CLINICS
+-- #############################################################################
+-- Clinics are publicly readable; own doctor can manage; super_admin full access
+create policy "clinics_select_public"
+    on public.clinics for select
+    using (true);
+
+create policy "clinics_insert_doctor"
+    on public.clinics for insert
+    with check (
+        auth.uid() = doctor_id
+        or public.is_super_admin()
+    );
+
+create policy "clinics_update_doctor"
+    on public.clinics for update
+    using (
+        auth.uid() = doctor_id
+        or public.is_super_admin()
+    );
+
+create policy "clinics_delete_doctor"
+    on public.clinics for delete
+    using (
+        auth.uid() = doctor_id
+        or public.is_super_admin()
+    );
+
+-- #############################################################################
+-- 19f. RLS: SCHEDULES
+-- #############################################################################
+-- Publicly readable (needed for booking flow); clinic doctor manages
+create policy "schedules_select_public"
+    on public.schedules for select
+    using (true);
+
+create policy "schedules_insert_clinic_doctor"
+    on public.schedules for insert
+    with check (
+        exists (
+            select 1 from public.clinics c
+            where c.id = clinic_id
+              and (c.doctor_id = auth.uid() or public.is_super_admin())
+        )
+    );
+
+create policy "schedules_update_clinic_doctor"
+    on public.schedules for update
+    using (
+        exists (
+            select 1 from public.clinics c
+            where c.id = clinic_id
+              and (c.doctor_id = auth.uid() or public.is_super_admin())
+        )
+    );
+
+create policy "schedules_delete_clinic_doctor"
+    on public.schedules for delete
+    using (
+        exists (
+            select 1 from public.clinics c
+            where c.id = clinic_id
+              and (c.doctor_id = auth.uid() or public.is_super_admin())
+        )
+    );
+
+-- #############################################################################
+-- 19g. RLS: SCHEDULE EXCEPTIONS
+-- #############################################################################
+-- Publicly readable; clinic doctor manages
+create policy "schedule_exceptions_select_public"
+    on public.schedule_exceptions for select
+    using (true);
+
+create policy "schedule_exceptions_insert_clinic_doctor"
+    on public.schedule_exceptions for insert
+    with check (
+        exists (
+            select 1 from public.clinics c
+            where c.id = clinic_id
+              and (c.doctor_id = auth.uid() or public.is_super_admin())
+        )
+    );
+
+create policy "schedule_exceptions_update_clinic_doctor"
+    on public.schedule_exceptions for update
+    using (
+        exists (
+            select 1 from public.clinics c
+            where c.id = clinic_id
+              and (c.doctor_id = auth.uid() or public.is_super_admin())
+        )
+    );
+
+create policy "schedule_exceptions_delete_clinic_doctor"
+    on public.schedule_exceptions for delete
+    using (
+        exists (
+            select 1 from public.clinics c
+            where c.id = clinic_id
+              and (c.doctor_id = auth.uid() or public.is_super_admin())
+        )
+    );
+
+-- #############################################################################
+-- 19h. RLS: BOOKINGS
+-- #############################################################################
+-- Read: involved parties only (patient, doctor, clinic doctor)
+create policy "bookings_select_involved"
+    on public.bookings for select
+    using (
+        auth.uid() = patient_id
+        or auth.uid() = doctor_id
+        or exists (
+            select 1 from public.clinics c
+            where c.id = clinic_id
+              and (c.doctor_id = auth.uid() or public.is_super_admin())
+        )
+        or public.is_super_admin()
+    );
+
+-- Insert: patient must own the booking (patient_id = auth.uid())
+create policy "bookings_insert_patient"
+    on public.bookings for insert
+    with check (
+        auth.uid() = patient_id
+        and exists (
+            select 1 from public.patients p where p.id = auth.uid()
+        )
+    );
+
+-- Update: involved parties can update (e.g. cancel)
+create policy "bookings_update_involved"
+    on public.bookings for update
+    using (
+        auth.uid() = patient_id
+        or auth.uid() = doctor_id
+        or public.is_super_admin()
+    );
+
+-- #############################################################################
+-- 19i. RLS: REVIEWS
+-- #############################################################################
+-- Public read
+create policy "reviews_select_public"
+    on public.reviews for select
+    using (true);
+
+-- Insert: only after completed booking, by patient or doctor on that booking
+create policy "reviews_insert_after_completed"
+    on public.reviews for insert
+    with check (
+        exists (
+            select 1 from public.bookings b
+            where b.id = booking_id
+              and b.status = 'completed'
+              and (
+                  b.patient_id = auth.uid()
+                  or b.doctor_id = auth.uid()
+              )
+        )
+    );
+
+-- Update: patient can edit own review; doctor can add reply; super_admin
+create policy "reviews_update_involved"
+    on public.reviews for update
+    using (
+        exists (
+            select 1 from public.bookings b
+            where b.id = booking_id
+              and (
+                  b.patient_id = auth.uid()
+                  or b.doctor_id = auth.uid()
+                  or public.is_super_admin()
+              )
+        )
+    );
+
+-- #############################################################################
+-- 19j. RLS: SPECIALTIES
+-- #############################################################################
+create policy "specialties_select_public"
+    on public.specialties for select
+    using (true);
+
+-- #############################################################################
+-- 19k. RLS: WILAYAS
+-- #############################################################################
+create policy "wilayas_select_public"
+    on public.wilayas for select
+    using (true);
+
+-- #############################################################################
+-- 19l. RLS: COMMUNES
+-- #############################################################################
+create policy "communes_select_public"
+    on public.communes for select
+    using (true);
+
+-- #############################################################################
+-- 19m. RLS: NOTIFICATIONS
+-- #############################################################################
+create policy "notifications_select_own"
+    on public.notifications for select
+    using (auth.uid() = user_id or public.is_super_admin());
+
+create policy "notifications_update_own"
+    on public.notifications for update
+    using (auth.uid() = user_id or public.is_super_admin());
+
+-- #############################################################################
+-- 19n. RLS: PUSH TOKENS
+-- #############################################################################
+create policy "push_tokens_select_own"
+    on public.push_tokens for select
+    using (auth.uid() = user_id or public.is_super_admin());
+
+create policy "push_tokens_insert_own"
+    on public.push_tokens for insert
+    with check (auth.uid() = user_id);
+
+create policy "push_tokens_delete_own"
+    on public.push_tokens for delete
+    using (auth.uid() = user_id or public.is_super_admin());
+
+-- #############################################################################
+-- 19o. RLS: PATIENT FAVORITES
+-- #############################################################################
+create policy "patient_favorites_select_patient"
+    on public.patient_favorites for select
+    using (
+        auth.uid() = patient_id
+        or auth.uid() = doctor_id
+        or public.is_super_admin()
+    );
+
+create policy "patient_favorites_insert_patient"
+    on public.patient_favorites for insert
+    with check (auth.uid() = patient_id);
+
+create policy "patient_favorites_delete_patient"
+    on public.patient_favorites for delete
+    using (
+        auth.uid() = patient_id
+        or public.is_super_admin()
+    );
