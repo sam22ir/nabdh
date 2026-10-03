@@ -13,13 +13,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useMutation, useQuery } from 'convex/react';
-import { ConvexError } from 'convex/values';
+import { useMutation, useQuery } from '@/lib/backend';
 
-import { api } from '@/convex/_generated/api';
+import { api } from '@/lib/backend/api';
+import { BackendError } from '@/lib/backend';
 import { DoctorHeader, DoctorSection } from '@/components/doctor-ui';
 import { theme } from '@/lib/theme';
-import type { Id } from '@/convex/_generated/dataModel';
+import type { Id } from '@/lib/backend/types';
 import type { DayOfWeek } from '@/lib/types';
 
 type MembershipCard = {
@@ -100,7 +100,7 @@ const DEFAULT_END = '17:00';
 const DEFAULT_DURATION = 20;
 
 function getArabicError(error: unknown, fallback: string) {
-  if (error instanceof ConvexError && typeof error.message === 'string') {
+  if (error instanceof BackendError && typeof error.message === 'string') {
     return error.message;
   }
   if (error instanceof Error && error.message) {

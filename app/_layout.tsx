@@ -3,14 +3,11 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts } from 'expo-font';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ClerkProvider, useAuth } from '@clerk/clerk-expo';
-import { tokenCache } from '@clerk/clerk-expo/token-cache';
-import { ConvexProviderWithClerk } from 'convex/react-clerk';
-import { useConvex, useConvexAuth } from 'convex/react';
+import { BackendProvider, useAuthState, useBackend } from '@/lib/backend';
 import { I18nManager, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { convex } from '../src/lib/convex';
-import ConvexErrorBoundary from '../src/components/ConvexErrorBoundary';
+import { AuthProvider } from '../src/lib/auth';
+import BackendErrorBoundary from '../src/components/BackendErrorBoundary';
 import {
   registerPushNotifications,
   unregisterPushNotifications,
@@ -34,14 +31,6 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
   document.documentElement.dir = 'rtl';
   document.documentElement.lang = 'ar';
   document.body.dir = 'rtl';
-}
-
-const clerkPublishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
-
-if (!clerkPublishableKey) {
-  throw new Error(
-    'EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY is not set. Add your Clerk publishable key to the app environment.',
-  );
 }
 
 function installWebClipboardGuard() {
@@ -76,8 +65,8 @@ function removeLegacyAuthStore() {
 }
 
 function PushNotificationsRegistrar() {
-  const convexClient = useConvex();
-  const { isAuthenticated, isLoading } = useConvexAuth();
+  const convexClient = useBackend();
+  const { isAuthenticated, isLoading } = useAuthState();
 
   useEffect(() => {
     if (isLoading || !isAuthenticated) return;
@@ -136,22 +125,23 @@ function RootLayout() {
   }
 
   return (
-    <ClerkProvider publishableKey={clerkPublishableKey} tokenCache={tokenCache}>
-      <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
-        <ConvexErrorBoundary>
+    <AuthProvider>
+      <BackendProvider>
+        <BackendErrorBoundary>
           <SafeAreaProvider>
             <PushNotificationsRegistrar />
             <Stack screenOptions={{ headerShown: false }}>
               <Stack.Screen name="index" />
+              <Stack.Screen name="onboarding" />
               <Stack.Screen name="(auth)" />
               <Stack.Screen name="(patient)" />
               <Stack.Screen name="(doctor)" />
               <Stack.Screen name="(clinic)" />
             </Stack>
           </SafeAreaProvider>
-        </ConvexErrorBoundary>
-      </ConvexProviderWithClerk>
-    </ClerkProvider>
+        </BackendErrorBoundary>
+      </BackendProvider>
+    </AuthProvider>
   );
 }
 

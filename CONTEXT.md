@@ -2,9 +2,9 @@
 
 A medical appointment booking platform connecting Algerian patients with private-practice doctors. The name نبض means "pulse" in Arabic.
 
-Built with React Native + Expo SDK 56 (Android-first, iOS-ready), Convex backend, Expo Router for file-based navigation, Convex Auth, Convex React hooks, and Zustand for local UI preferences. RTL-first Arabic UI with French support. StyleSheet + shared theme tokens (no NativeWind). Email+password auth for all users. Single app with role-gated Patient/Doctor shells.
+Built with React Native + Expo SDK 56 (Android-first, iOS-ready), Supabase backend (Postgres + Row Level Security + Realtime), Supabase Auth with Google as the only sign-in method, Expo Router for file-based navigation, TanStack Query, and Zustand for local UI preferences. RTL-first Arabic UI with French support. StyleSheet + shared theme tokens (no NativeWind). Single app with role-gated Patient/Doctor shells.
 
-Legacy Supabase SQL may exist only as archived historical reference. Do not deploy files from `supabase/legacy_migrations`; active data model, auth, authorization, and business logic live in Convex.
+The active data model, authorization (RLS) and business logic live in `supabase/migrations`. The `convex/` folder is the previous backend, kept only until the migration is finished (see `docs/superpowers/plans/2026-10-03-convex-to-supabase-migration.md`). Do not deploy `supabase/legacy_migrations`.
 
 **Profile** (الملف الفرعي):
 A sub-identity under a Patient's account representing a family member (spouse, child, parent). A Patient can have multiple Profiles. When booking, the Patient selects which Profile the appointment is for. Each Profile carries its own name, DOB, gender, and medical info.
@@ -13,11 +13,11 @@ _Avoid_: sub-account, dependent, family member
 ## Actors
 
 **Patient** (المريض):
-A person who uses the app to find doctors and book appointments. Authenticated via email + password. Phone number is required on profile but is not an auth factor.
+A person who uses the app to find doctors and book appointments. Authenticated with Google only. Phone number is required on profile but is not an auth factor.
 _Avoid_: user, client, customer
 
 **Doctor** (الطبيب):
-A private-practice physician with a completed profile. Manages their schedule, confirms appointments, and responds to reviews. Authenticated via email + password. Manual verification of the نقابة registration number is a trust badge, not the public visibility gate.
+A private-practice physician with a completed profile. Manages their schedule, confirms appointments, and responds to reviews. Authenticated with Google only. Manual verification of the نقابة registration number is a trust badge, not the public visibility gate.
 _Avoid_: provider, practitioner, clinician
 
 **Public Doctor Visibility**:

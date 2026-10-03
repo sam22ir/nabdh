@@ -1,27 +1,22 @@
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 
-function listSqlFiles(dir: string): string[] {
-  if (!existsSync(dir)) return [];
-
-  return readdirSync(dir).flatMap((entry) => {
-    const path = join(dir, entry);
-    const stat = statSync(path);
-    if (stat.isDirectory()) return listSqlFiles(path);
-    return entry.endsWith(".sql") ? [path] : [];
-  });
-}
-
 describe("backend selection", () => {
-  test("documents Convex as active backend and has no deployable Supabase migrations", () => {
+  test("documents Supabase as the active backend and ships its migrations", () => {
     const context = readFileSync(join(process.cwd(), "CONTEXT.md"), "utf8");
-    const activeSupabaseSql = listSqlFiles(
-      join(process.cwd(), "supabase/migrations"),
-    );
+    const dir = join(process.cwd(), "supabase/migrations");
+    const sql = existsSync(dir)
+      ? readdirSync(dir).filter((file) => file.endsWith(".sql"))
+      : [];
 
-    expect(context).toContain("Convex backend");
-    expect(context).not.toContain("Supabase backend");
-    expect(activeSupabaseSql).toEqual([]);
+    expect(context).toContain("Supabase backend");
+    expect(context).toContain("Google");
+    expect(sql.length).toBeGreaterThan(0);
+  });
+
+  test("the app no longer depends on Clerk", () => {
+    const pkg = JSON.parse(readFileSync(join(process.cwd(), "package.json"), "utf8"));
+    expect(Object.keys({ ...pkg.dependencies, ...pkg.devDependencies }).some((name) => name.startsWith("@clerk/"))).toBe(false);
   });
 });

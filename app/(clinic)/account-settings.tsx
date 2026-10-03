@@ -11,39 +11,30 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useClerk, useSignIn, useUser } from '@clerk/clerk-expo';
-import { useConvex, useMutation, useQuery } from 'convex/react';
+import { useAuth } from '@/lib/auth';
+import { useMutation, useQuery } from '@/lib/backend';
 
-import { api } from '@/convex/_generated/api';
+import { api } from '@/lib/backend/api';
 import { DoctorHeader, DoctorSection } from '@/components/doctor-ui';
 import LegalDocumentsLinks from '@/components/LegalDocumentsLinks';
-import { buildClerkPasswordIdentifierFromLoginKey } from '@/lib/phone';
 import { theme } from '@/lib/theme';
 import { useAuthStore } from '@/stores/authStore';
 
 export default function ClinicAccountSettingsScreen() {
   const router = useRouter();
-  const convex = useConvex();
-  const { signOut } = useClerk();
-  const { user } = useUser();
-  const { signIn, isLoaded: isSignInLoaded } = useSignIn();
+  const { signOut } = useAuth();
   const me = useQuery(api.users.me, {});
   const clearUser = useAuthStore((s) => s.clearUser);
   const deleteClinicAccount = useMutation(api.users.deleteMyClinicAccount);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [enteredPhone, setEnteredPhone] = useState('');
-  const [deletePassword, setDeletePassword] = useState('');
+  const [confirmText, setConfirmText] = useState('');
 
-  const canDeleteAccount =
-    enteredPhone === me?.phone &&
-    deletePassword.trim().length > 0 &&
-    !isDeleting;
+  const canDeleteAccount = confirmText.trim() === 'حذف' && !isDeleting;
 
   const openDeleteModal = useCallback(() => {
-    setEnteredPhone('');
-    setDeletePassword('');
+    setConfirmText('');
     setDeleteError(null);
     setDeleteModalVisible(true);
   }, []);
@@ -54,16 +45,8 @@ export default function ClinicAccountSettingsScreen() {
   }, [isDeleting]);
 
   const handleDeleteAccount = useCallback(async () => {
-    if (!user?.deleteSelfEnabled) {
-      setDeleteError('تعذر حذف الحساب من تسجيل الدخول حالياً.');
-      return;
-    }
-    if (!me?.phone || !isSignInLoaded || !signIn) {
-      setDeleteError('تعذر التحقق من الحساب حالياً. حاول مرة أخرى.');
-      return;
-    }
     if (!canDeleteAccount) {
-      setDeleteError('أدخل رقم الهاتف المسجل نفسه وكلمة المرور للمتابعة.');
+      setDeleteError('اكتب كلمة «حذف» للمتابعة.');
       return;
     }
 
@@ -71,49 +54,15 @@ export default function ClinicAccountSettingsScreen() {
     setDeleteError(null);
 
     try {
-      const account = await convex.query(api.users.findAccountByIdentifier, {
-        phone: enteredPhone,
-        email: '',
-      });
-      if (!account.exists || account.role !== 'clinic') {
-        setDeleteError('رقم الهاتف أو كلمة المرور غير صحيحة');
-        setIsDeleting(false);
-        return;
-      }
-      const clerkIdentifier = buildClerkPasswordIdentifierFromLoginKey(
-        account.phoneLoginKey,
-      );
-      const result = await signIn.create({
-        identifier: clerkIdentifier,
-        password: deletePassword,
-      });
-      if (result.status !== 'complete') {
-        throw new Error('Invalid re-auth state');
-      }
-
       await deleteClinicAccount({});
-      await user?.delete();
       await signOut();
       clearUser();
       router.replace('/');
     } catch {
-      setDeleteError('رقم الهاتف أو كلمة المرور غير صحيحة');
+      setDeleteError('تعذر حذف الحساب. حاول مرة أخرى.');
       setIsDeleting(false);
     }
-  }, [
-    canDeleteAccount,
-    clearUser,
-    convex,
-    deleteClinicAccount,
-    deletePassword,
-    enteredPhone,
-    isSignInLoaded,
-    me?.phone,
-    router,
-    signIn,
-    signOut,
-    user,
-  ]);
+  }, [canDeleteAccount, clearUser, deleteClinicAccount, router, signOut]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -191,27 +140,13 @@ export default function ClinicAccountSettingsScreen() {
                 القادمة، ثم حذف حساب تسجيل الدخول نهائياً.
               </Text>
               <View style={styles.confirmationBlock}>
-                <Text style={styles.confirmationLabel}>رقم الهاتف المسجل</Text>
+                <Text style={styles.confirmationLabel}>اكتب «حذف» للتأكيد</Text>
                 <TextInput
-                  value={enteredPhone}
-                  onChangeText={setEnteredPhone}
-                  placeholder={me?.phone ?? 'أدخل رقم الهاتف المسجل'}
-                  keyboardType="phone-pad"
+                  value={confirmText}
+                  onChangeText={setConfirmText}
+                  placeholder="حذف"
                   editable={!isDeleting}
                   style={styles.confirmPhoneInput}
-                  placeholderTextColor={theme.colors.textMuted}
-                  textAlign="right"
-                />
-              </View>
-              <View style={styles.confirmationBlock}>
-                <Text style={styles.confirmationLabel}>كلمة المرور</Text>
-                <TextInput
-                  value={deletePassword}
-                  onChangeText={setDeletePassword}
-                  placeholder="أدخل كلمة المرور"
-                  secureTextEntry
-                  editable={!isDeleting}
-                  style={styles.confirmPasswordInput}
                   placeholderTextColor={theme.colors.textMuted}
                   textAlign="right"
                 />

@@ -21,15 +21,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AppAvatar from '@/components/AppAvatar';
-import { useMutation, useQuery } from 'convex/react';
+import { useMutation, useQuery } from '@/lib/backend';
 
-import { api } from '@/convex/_generated/api';
+import { api } from '@/lib/backend/api';
 import { theme } from '@/lib/theme';
 import { rtlTextAlign } from '@/lib/rtl';
 import { getArabicErrorMessage } from '@/lib/errorMessages';
 import { routeParamString } from '@/lib/routeParams';
 import { getClinicMapUrl } from '@/lib/clinicMapLink';
-import type { Id } from '@/convex/_generated/dataModel';
+import type { Id } from '@/lib/backend/types';
 
 // =============================================================================
 // Types – mirrors the Convex return shapes

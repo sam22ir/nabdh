@@ -18,9 +18,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery } from 'convex/react';
+import { useQuery } from '@/lib/backend';
 
-import { api } from '@/convex/_generated/api';
+import { api } from '@/lib/backend/api';
 import { theme } from '@/lib/theme';
 import { routeParamString } from '@/lib/routeParams';
 import {
@@ -30,7 +30,7 @@ import {
   getBookingDayOfWeek,
   selectInitialBookingDate,
 } from '@/lib/bookingDates';
-import type { Id } from '@/convex/_generated/dataModel';
+import type { Id } from '@/lib/backend/types';
 
 // =============================================================================
 // Types – mirrors the actual Convex shapes

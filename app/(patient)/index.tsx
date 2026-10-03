@@ -16,8 +16,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AppAvatar from '@/components/AppAvatar';
-import { usePaginatedQuery, useQuery } from 'convex/react';
-import { api } from '@/convex/_generated/api';
+import { usePaginatedQuery, useQuery } from '@/lib/backend';
+import { api } from '@/lib/backend/api';
 
 import DoctorCard, { DoctorCardData } from '@/components/DoctorCard';
 import EmptyState from '@/components/EmptyState';
@@ -28,7 +28,7 @@ import { theme } from '@/lib/theme';
 import { rtlTextAlign } from '@/lib/rtl';
 import { getClinicMapUrl } from '@/lib/clinicMapLink';
 import type { Appointment, AppointmentStatus } from '@/lib/types';
-import type { Id } from '@/convex/_generated/dataModel';
+import type { Id } from '@/lib/backend/types';
 
 // =============================================================================
 // Constants

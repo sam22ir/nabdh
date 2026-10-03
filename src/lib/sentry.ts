@@ -3,8 +3,8 @@ import * as Sentry from '@sentry/react-native';
 import type { PublicAuthRole } from './roleSelection';
 
 type AuthExceptionContext = {
-  flow: 'login' | 'register' | 'finalize-registration';
-  role?: PublicAuthRole;
+  flow: 'google-sign-in' | 'onboarding';
+  role?: PublicAuthRole | 'none';
 };
 
 const sentryDsn = process.env.EXPO_PUBLIC_SENTRY_DSN;

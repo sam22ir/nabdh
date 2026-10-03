@@ -33,7 +33,7 @@ interface State {
  * server returns an error or the client encounters a network / auth failure.
  * This boundary catches those errors and presents a friendly retry screen.
  */
-class ConvexErrorBoundary extends Component<Props, State> {
+class BackendErrorBoundary extends Component<Props, State> {
   state: State = { error: null };
 
   static getDerivedStateFromError(error: Error): State {
@@ -142,4 +142,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ConvexErrorBoundary;
+export default BackendErrorBoundary;

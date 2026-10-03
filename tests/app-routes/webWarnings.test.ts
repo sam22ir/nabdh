@@ -21,12 +21,10 @@ describe("React Native Web warning cleanup", () => {
 
   test("modal backdrops do not render as parent buttons around child buttons", () => {
     const searchSource = source("app/(patient)/search.tsx");
-    const patientRegisterSource = source("app/(auth)/patient/register.tsx");
-    const doctorRegisterSource = source("app/(auth)/doctor/register.tsx");
+    const onboardingSource = source("app/onboarding.tsx");
 
     expect(searchSource).not.toMatch(/<Pressable\s+style=\{styles\.modalOverlay\}/);
-    expect(patientRegisterSource).not.toMatch(/<Pressable\s+style=\{fieldStyles\.modalOverlay\}/);
-    expect(doctorRegisterSource).not.toMatch(/<Pressable\s+style=\{fieldStyles\.modalOverlay\}/);
+    expect(onboardingSource).not.toMatch(/<Pressable\s+style=\{styles\.overlay\}/);
   });
 
   test("appointment cards with action buttons do not nest buttons", () => {

@@ -1,8 +1,11 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { mutation, query, requireUser, unwrap } from '../core';
 import { toDoc, wilayaIdToSql } from '../convert';
 import { supabase } from '../../supabase';
 
-async function loadMe(userId: string) {
+export const ACTIVE_MODE_KEY = 'nabdh.activeMode';
+
+async function loadMe(userId: string): Promise<any> {
   const [{ data: profile }, { data: priv }] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
     supabase.from('profile_private').select('*').eq('user_id', userId).maybeSingle(),
@@ -10,9 +13,25 @@ async function loadMe(userId: string) {
   if (!profile) return null;
 
   let joined: unknown = null;
+  let role: string = profile.role;
+  let soloClinic: Record<string, unknown> | null = null;
   if (profile.role === 'doctor') {
     const { data } = await supabase.from('doctors').select('*').eq('id', userId).maybeSingle();
     joined = data && { ...data, user_id: userId };
+    // A specialist who works alone also owns a personal center ("solo practice").
+    const { data: solo } = await supabase
+      .from('clinics')
+      .select('*')
+      .eq('owner_id', userId)
+      .eq('is_solo', true)
+      .maybeSingle();
+    soloClinic = solo;
+    const mode = await AsyncStorage.getItem(ACTIVE_MODE_KEY);
+    if (solo && mode === 'clinic') {
+      // Center view: present the same account as the center it owns.
+      role = 'clinic';
+      joined = { ...solo, owner_user_id: userId };
+    }
   } else if (profile.role === 'clinic') {
     const { data } = await supabase
       .from('clinics')
@@ -28,6 +47,9 @@ async function loadMe(userId: string) {
 
   return {
     ...toDoc<Record<string, unknown>>(profile),
+    role,
+    actualRole: profile.role,
+    canSwitchRole: Boolean(soloClinic),
     phone: priv?.phone ?? '',
     phoneNormalized: priv?.phone ?? '',
     email: priv?.email ?? undefined,
@@ -38,7 +60,24 @@ async function loadMe(userId: string) {
   };
 }
 
+const deleteAccount = mutation(async (ctx) => {
+  requireUser(ctx);
+  unwrap(await ctx.db.rpc('delete_my_account'));
+  return { ok: true };
+});
+
 export const users = {
+  deleteMyPatientAccount: deleteAccount,
+  deleteMyDoctorAccount: deleteAccount,
+  deleteMyClinicAccount: deleteAccount,
+
+  /** Solo specialists switch between the specialist view and their center view. */
+  setActiveMode: mutation(async (ctx, args: { mode: 'doctor' | 'clinic' }) => {
+    requireUser(ctx);
+    await AsyncStorage.setItem(ACTIVE_MODE_KEY, args.mode);
+    return { ok: true };
+  }),
+
   /** Signed-in account with its role profile, or null if not onboarded yet. */
   me: query(async (ctx) => (ctx.userId ? await loadMe(ctx.userId) : null)),
 

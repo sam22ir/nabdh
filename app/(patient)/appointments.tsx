@@ -22,10 +22,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useQuery, useMutation } from 'convex/react';
+import { useQuery, useMutation } from '@/lib/backend';
 import { Ionicons } from '@expo/vector-icons';
 
-import { api } from '@/convex/_generated/api';
+import { api } from '@/lib/backend/api';
 import AppointmentCard from '@/components/AppointmentCard';
 import EmptyState from '@/components/EmptyState';
 import { DoctorHeader } from '@/components/doctor-ui';
@@ -34,7 +34,7 @@ import { theme } from '@/lib/theme';
 import { getArabicErrorMessage } from '@/lib/errorMessages';
 import { getClinicMapUrl } from '@/lib/clinicMapLink';
 import type { AppointmentStatus } from '@/lib/types';
-import type { Id } from '@/convex/_generated/dataModel';
+import type { Id } from '@/lib/backend/types';
 
 // =============================================================================
 // Types

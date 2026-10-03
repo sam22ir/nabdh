@@ -8,12 +8,12 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useMutation, usePaginatedQuery, useQuery } from 'convex/react';
+import { useMutation, usePaginatedQuery, useQuery } from '@/lib/backend';
 import { ConvexError } from 'convex/values';
 import { Ionicons } from '@expo/vector-icons';
 
-import { api } from '@/convex/_generated/api';
-import type { Id } from '@/convex/_generated/dataModel';
+import { api } from '@/lib/backend/api';
+import type { Id } from '@/lib/backend/types';
 import SearchBar from '@/components/SearchBar';
 import { DoctorSection } from '@/components/doctor-ui';
 import { Badge, Button, Panel } from '@/components/ui';

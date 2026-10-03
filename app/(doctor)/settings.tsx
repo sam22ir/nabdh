@@ -10,7 +10,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useClerk } from '@clerk/clerk-expo';
+import { useAuth } from '@/lib/auth';
+import { useMutation, useQuery } from '@/lib/backend';
+import { api } from '@/lib/backend/api';
 
 import {
   DoctorHeader,
@@ -136,8 +138,10 @@ const ActionModal: React.FC<ActionModalProps> = ({
 
 export default function DoctorSettingsScreen() {
   const router = useRouter();
-  const { signOut } = useClerk();
+  const { signOut } = useAuth();
   const clearUser = useAuthStore((s) => s.clearUser);
+  const me = useQuery(api.users.me, {});
+  const setActiveMode = useMutation(api.users.setActiveMode);
 
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
 
@@ -146,6 +150,11 @@ export default function DoctorSettingsScreen() {
   const handleLogout = useCallback(() => {
     setLogoutModalVisible(true);
   }, []);
+
+  const handleSwitchToCenter = useCallback(async () => {
+    await setActiveMode({ mode: 'clinic' });
+    router.replace('/');
+  }, [router, setActiveMode]);
 
   const handleConfirmLogout = useCallback(async () => {
     await signOut();
@@ -173,6 +182,12 @@ export default function DoctorSettingsScreen() {
               label="إعدادات الحساب"
               onPress={() => router.push('/(doctor)/account-settings')}
             />
+            {me?.canSwitchRole ? (
+              <OptionRow
+                label="التبديل إلى حساب المركز"
+                onPress={() => void handleSwitchToCenter()}
+              />
+            ) : null}
           </View>
         </DoctorSection>
 

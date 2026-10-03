@@ -22,15 +22,15 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery, useMutation } from 'convex/react';
-import { ConvexError } from 'convex/values';
+import { useQuery, useMutation } from '@/lib/backend';
 
-import { api } from '@/convex/_generated/api';
+import { api } from '@/lib/backend/api';
+import { BackendError } from '@/lib/backend';
 import { theme } from '@/lib/theme';
 import { getArabicErrorMessage } from '@/lib/errorMessages';
 import { isIsoDateParam, isTimeParam, routeParamString } from '@/lib/routeParams';
 import type { VisitType } from '@/lib/types';
-import type { Id } from '@/convex/_generated/dataModel';
+import type { Id } from '@/lib/backend/types';
 
 // =============================================================================
 // Types
@@ -407,7 +407,7 @@ export default function BookingConfirmScreen() {
       });
     } catch (error) {
       // Check for booking-time Convex errors.
-      if (error instanceof ConvexError) {
+      if (error instanceof BackendError) {
         const data = error.data as Record<string, unknown> | undefined;
         if (data?.code === 'slot_taken') {
           Alert.alert(

@@ -1,10 +1,12 @@
 import { Platform } from "react-native";
 import Constants, { ExecutionEnvironment } from "expo-constants";
-import type { ConvexReactClient } from "convex/react";
-import { api } from "@/convex/_generated/api";
+import { api } from '@/lib/backend/api';
+import type { useBackend } from '@/lib/backend';
+
+type BackendClient = ReturnType<typeof useBackend>;
 
 type RegisterPushNotificationsOptions = {
-  convex: ConvexReactClient;
+  convex: BackendClient;
 };
 
 function getProjectId(): string | undefined {
@@ -61,7 +63,7 @@ export async function registerPushNotifications({
 }
 
 export async function unregisterPushNotifications(
-  convex: ConvexReactClient,
+  convex: BackendClient,
   token: string | null,
 ) {
   if (!token) return;

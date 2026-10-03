@@ -18,9 +18,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useMutation, usePaginatedQuery, useQuery } from 'convex/react';
+import { useMutation, usePaginatedQuery, useQuery } from '@/lib/backend';
 
-import { api } from '@/convex/_generated/api';
+import { api } from '@/lib/backend/api';
+import { BackendError } from '@/lib/backend';
 import {
   AppointmentWorkItem,
   DoctorHeader,
@@ -35,7 +36,7 @@ import { stripArabicDoctorTitle } from '@/lib/doctorNames';
 import { theme } from '@/lib/theme';
 import { rtlTextAlign } from '@/lib/rtl';
 import type { Appointment, AppointmentStatus, VisitType } from '@/lib/types';
-import type { Id } from '@/convex/_generated/dataModel';
+import type { Id } from '@/lib/backend/types';
 
 // =============================================================================
 // Constants
@@ -516,7 +517,7 @@ const TodayPatientsEmptyState: React.FC = () => (
 );
 
 function getArabicError(error: unknown, fallback: string) {
-  if (error instanceof ConvexError) {
+  if (error instanceof BackendError) {
     return typeof error.message === 'string' ? error.message : fallback;
   }
   if (error instanceof Error && error.message) {

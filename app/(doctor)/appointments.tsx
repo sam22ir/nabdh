@@ -19,10 +19,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { usePaginatedQuery, useQuery } from 'convex/react';
+import { usePaginatedQuery, useQuery } from '@/lib/backend';
 import { useRouter } from 'expo-router';
 
-import { api } from '@/convex/_generated/api';
+import { api } from '@/lib/backend/api';
 import EmptyState from '@/components/EmptyState';
 import {
   AppointmentWorkItem,
@@ -36,7 +36,7 @@ import { theme } from '@/lib/theme';
 import { rtlTextAlign } from '@/lib/rtl';
 import { buildDoctorWeekSections, type DoctorWeekSection } from '@/lib/doctorAppointmentWeeks';
 import type { Appointment, AppointmentStatus, VisitType } from '@/lib/types';
-import type { Id } from '@/convex/_generated/dataModel';
+import type { Id } from '@/lib/backend/types';
 
 // =============================================================================
 // Constants

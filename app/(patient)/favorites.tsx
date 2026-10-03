@@ -21,9 +21,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery, useMutation } from 'convex/react';
+import { useQuery, useMutation } from '@/lib/backend';
 
-import { api } from '@/convex/_generated/api';
+import { api } from '@/lib/backend/api';
 import DoctorCard, { DoctorCardData } from '@/components/DoctorCard';
 import EmptyState from '@/components/EmptyState';
 import SearchBar from '@/components/SearchBar';
@@ -31,7 +31,7 @@ import { DoctorHeader } from '@/components/doctor-ui';
 import { LoadingState } from '@/components/ui';
 import { theme } from '@/lib/theme';
 import { rtlTextAlign } from '@/lib/rtl';
-import type { Id } from '@/convex/_generated/dataModel';
+import type { Id } from '@/lib/backend/types';
 
 // =============================================================================
 // Types

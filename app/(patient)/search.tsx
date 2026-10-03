@@ -22,8 +22,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery, usePaginatedQuery } from 'convex/react';
-import { api } from '@/convex/_generated/api';
+import { useQuery, usePaginatedQuery } from '@/lib/backend';
+import { api } from '@/lib/backend/api';
 
 import DoctorCard, { DoctorCardData } from '@/components/DoctorCard';
 import SearchBar from '@/components/SearchBar';
@@ -33,7 +33,7 @@ import { Badge, Button, LoadingState } from '@/components/ui';
 import { theme } from '@/lib/theme';
 import { rtlTextAlign } from '@/lib/rtl';
 import { routeParamAllowedValue, routeParamString } from '@/lib/routeParams';
-import type { Id } from '@/convex/_generated/dataModel';
+import type { Id } from '@/lib/backend/types';
 
 // =============================================================================
 // Types

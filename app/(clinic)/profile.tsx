@@ -12,10 +12,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useMutation, useQuery } from 'convex/react';
+import { useMutation, useQuery } from '@/lib/backend';
 
-import { api } from '@/convex/_generated/api';
-import type { Id } from '@/convex/_generated/dataModel';
+import { api } from '@/lib/backend/api';
+import type { Id } from '@/lib/backend/types';
 import ClinicDoctorsManager from '@/components/ClinicDoctorsManager';
 import { DoctorHeader, DoctorSection } from '@/components/doctor-ui';
 import { theme } from '@/lib/theme';

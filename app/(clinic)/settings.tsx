@@ -1,20 +1,22 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useClerk } from '@clerk/clerk-expo';
+import { useAuth } from '@/lib/auth';
 import { useRouter } from 'expo-router';
-import { useMutation, useQuery } from 'convex/react';
-import { api } from '@/convex/_generated/api';
+import { useMutation, useQuery } from '@/lib/backend';
+import { api } from '@/lib/backend/api';
 import { DoctorHeader, DoctorSection } from '@/components/doctor-ui';
 import { theme } from '@/lib/theme';
 import { useAuthStore } from '@/stores/authStore';
 
 export default function ClinicSettingsScreen() {
   const router = useRouter();
-  const { signOut } = useClerk();
+  const { signOut } = useAuth();
   const clearUser = useAuthStore((state) => state.clearUser);
   const serverSettings = useQuery(api.clinicSettings.getMy, {});
   const updateSettings = useMutation(api.clinicSettings.updateMy);
+  const me = useQuery(api.users.me, {});
+  const setActiveMode = useMutation(api.users.setActiveMode);
   const [autoCompleteAppointments, setAutoCompleteAppointments] = useState(true);
   const [newBookingAlerts, setNewBookingAlerts] = useState(true);
   const [cancellationAlerts, setCancellationAlerts] = useState(true);
@@ -154,6 +156,20 @@ export default function ClinicSettingsScreen() {
           </View>
         </DoctorSection>
 
+        {me?.canSwitchRole ? (
+          <DoctorSection title="التبديل بين الحسابين">
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => {
+                void setActiveMode({ mode: 'doctor' }).then(() => router.replace('/'));
+              }}
+              style={styles.switchRow}
+            >
+              <Text style={styles.switchText}>التبديل إلى حساب المختص</Text>
+            </Pressable>
+          </DoctorSection>
+        ) : null}
+
         <DoctorSection title="الحساب">
           <Pressable
             style={styles.accountButton}
@@ -171,6 +187,18 @@ export default function ClinicSettingsScreen() {
 }
 
 const styles = StyleSheet.create({
+  switchRow: {
+    minHeight: 52,
+    justifyContent: 'center',
+    paddingHorizontal: theme.spacing.lg,
+    borderRadius: theme.borderRadius.sm,
+    backgroundColor: theme.colors.surfaceRaised,
+  },
+  switchText: {
+    fontFamily: 'Cairo-Bold',
+    color: theme.colors.primary,
+    textAlign: 'right',
+  },
   safeArea: {
     flex: 1,
     backgroundColor: theme.colors.background,

@@ -121,7 +121,7 @@ describe('clinic app route tree', () => {
     expect(source).toContain('الملخص اليومي');
   });
 
-  test('clinic settings links to a hidden account settings screen with re-auth deletion', () => {
+  test('clinic settings links to a hidden account settings screen with typed-confirmation deletion', () => {
     const layoutSource = readFileSync(appPath('(clinic)', '_layout.tsx'), 'utf8');
     const settingsSource = readFileSync(appPath('(clinic)', 'settings.tsx'), 'utf8');
     const accountSettingsSource = readFileSync(
@@ -135,11 +135,6 @@ describe('clinic app route tree', () => {
     expect(settingsSource).toContain("router.push('/(clinic)/account-settings')");
     expect(settingsSource).toContain('إعدادات الحساب');
     expect(accountSettingsSource).toContain('api.users.deleteMyClinicAccount');
-    expect(accountSettingsSource).toContain('api.users.findAccountByIdentifier');
-    expect(accountSettingsSource).toContain('signIn.create');
-    expect(accountSettingsSource).toContain('user?.delete()');
     expect(accountSettingsSource).toContain("router.push('/(clinic)/settings')");
-    expect(accountSettingsSource).toContain('رقم الهاتف المسجل');
-    expect(accountSettingsSource).toContain('كلمة المرور');
   });
 });

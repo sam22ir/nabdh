@@ -1,6 +1,6 @@
 # Convex + Clerk -> Supabase migration plan
 
-Status: **Phase 1 done and applied to Supabase project `nabdh` (`oeexmfgpfotimfsqkntp`, new account, eu-west-1); Phases 2-7 not started.** See "Progress" at the end. Owner decision (2026-10-03): move the
+Status: **Phase 1 and the auth/onboarding half of Phase 2 are done (Supabase project `nabdh`, `oeexmfgpfotimfsqkntp`, eu-west-1). Phases 3-7 (porting the remaining Convex functions) are not done.** See "Progress" at the end. Owner decision (2026-10-03): move the
 whole backend from Convex to Supabase, remove Clerk, use Google sign-in with
 no email confirmation, and make first-time onboarding very short for every
 role. The owner was advised that keeping Convex and adding Google sign-in was
@@ -123,3 +123,37 @@ Decisions taken without owner input (all reversible, migrations are plain SQL):
    cleanup via `pg_cron`, Edge Function for push delivery.
 3. App: Supabase client + Google sign-in + new onboarding screens, replace
    Convex hooks (~116 call sites in 38 files), then delete Clerk/Convex.
+
+**Phase 2 (auth + onboarding) - code done 2026-10-03, not yet run on a device.**
+Spec: `docs/superpowers/specs/2026-10-03-google-only-onboarding-design.md`.
+- `src/lib/supabase.ts`, `src/lib/auth.tsx` (Google ID token -> Supabase),
+  `src/lib/backend/*` (adapter: `useQuery/useMutation/usePaginatedQuery`
+  against Supabase with Realtime invalidation; every screen now imports from
+  `@/lib/backend`, no screen imports Convex or Clerk).
+- Screens: `app/index.tsx` (role cards + Continue with Google + legal notice),
+  `app/onboarding.tsx` (client: no form; specialist: specialty + wilaya, then
+  "work alone?" pop-up with solo center + default schedule; center: name,
+  wilaya, required location, optional phone), `LocationField` + `MapPicker`
+  (GPS or OpenStreetMap/Leaflet), role switch in settings, account deletion by
+  typed confirmation.
+- Clerk screens, captcha, phone-login code and the Clerk dependency are gone.
+
+**Owner actions still needed before it can run**
+1. Supabase -> Authentication -> Providers -> Google: enable, paste the Web
+   client ID and secret, add the Android client ID to Authorized Client IDs;
+   turn off "Confirm email".
+2. Put `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` in `.env` and in the EAS environment.
+3. Run `supabase/migrations/20261003000010_delete_my_account.sql` once in the
+   Supabase SQL editor (the MCP tool holds DELETE statements for human
+   confirmation, so it was not applied automatically).
+4. Build a development build (Google sign-in and the map need native code;
+   Expo Go will not work).
+
+**Remaining backend work (Phase 3/4)**: 73 functions in 12 modules are listed in
+`src/lib/backend/handlers/pending.ts`; each throws "Not implemented yet" until
+ported. Port module by module (bookings, clinicMemberships, clinics, doctors,
+reviews, schedules, notifications, clinicSettings, doctorSettings,
+encounterNotes, patientProfiles) and delete the entry as you go. Also needed:
+Edge Function for push delivery, `pg_cron` jobs, and removing `convex/` at
+cutover. Drop the disabled legacy `onboard_clinic(text, smallint, text, text,
+text, text)` overload when convenient.

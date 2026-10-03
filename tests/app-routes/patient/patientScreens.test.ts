@@ -275,7 +275,7 @@ describe("patient screens use backend data", () => {
     expect(source).not.toContain("useState<PatientProfile[]>");
   });
 
-  test("patient profile links to a hidden account settings screen with re-auth deletion", () => {
+  test("patient profile links to a hidden account settings screen with typed-confirmation deletion", () => {
     const profileSource = readFileSync(
       join(process.cwd(), "app/(patient)/profile.tsx"),
       "utf8",
@@ -288,12 +288,7 @@ describe("patient screens use backend data", () => {
     expect(profileSource).toContain("label=\"إعدادات الحساب\"");
     expect(profileSource).toContain("router.push('/(patient)/account-settings')");
     expect(accountSettingsSource).toContain("api.users.deleteMyPatientAccount");
-    expect(accountSettingsSource).toContain("api.users.findAccountByIdentifier");
-    expect(accountSettingsSource).toContain("signIn.create");
-    expect(accountSettingsSource).toContain("user?.delete()");
     expect(accountSettingsSource).toContain("router.push('/(patient)/profile')");
-    expect(accountSettingsSource).toContain("رقم الهاتف المسجل");
-    expect(accountSettingsSource).toContain("كلمة المرور");
   });
 
   test("profile action buttons are wired to working UI and backend actions", () => {

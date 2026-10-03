@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import type { Id } from '@/convex/_generated/dataModel';
+import type { Id } from '@/lib/backend/types';
 import { specialtyDisplayName, type SpecialtyNameSource } from '@/lib/specialtyNames';
 import { theme } from '@/lib/theme';
 
@@ -182,7 +182,7 @@ const styles = StyleSheet.create({
   },
   placeholder: { fontFamily: theme.typography.fontFamily.arabic, color: theme.colors.textSecondary },
   overlay: { flex: 1, justifyContent: 'flex-end' },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: theme.colors.overlay },
+  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: theme.colors.overlay },
   sheet: {
     maxHeight: '82%',
     minHeight: '62%',

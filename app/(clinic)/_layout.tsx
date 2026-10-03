@@ -2,8 +2,8 @@ import { useEffect } from "react";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { Tabs, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { useQuery } from "convex/react";
-import { api } from "../../convex/_generated/api";
+import { useQuery } from '@/lib/backend';
+import { api } from '@/lib/backend/api';
 import { theme } from "@/lib/theme";
 
 const TAB_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {

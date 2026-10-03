@@ -13,11 +13,11 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
+import { useMutation, usePaginatedQuery, useQuery } from '@/lib/backend';
+import { api } from '@/lib/backend/api';
 import { DoctorHeader, DoctorSection } from "@/components/doctor-ui";
 import { theme } from "@/lib/theme";
-import type { Id } from "@/convex/_generated/dataModel";
+import type { Id } from '@/lib/backend/types';
 
 type ClinicAppointmentStatus =
   | "confirmed"

@@ -1,7 +1,7 @@
 import { ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useQuery } from 'convex/react';
-import { api } from '@/convex/_generated/api';
+import { useQuery } from '@/lib/backend';
+import { api } from '@/lib/backend/api';
 import { DoctorHeader, MetricStrip } from '@/components/doctor-ui';
 import { theme } from '@/lib/theme';
 

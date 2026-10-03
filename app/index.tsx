@@ -1,98 +1,90 @@
 import { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-import { useAuth } from '@clerk/clerk-expo';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useQuery } from 'convex/react';
-import { api } from '../convex/_generated/api';
-import {
-  getStoredAuthRole,
-  setStoredAuthRole,
-  type PublicAuthRole,
-} from '../src/lib/roleSelection';
-import { theme } from '../src/lib/theme';
 
-const roles: Array<{
+import LegalNotice from '@/components/LegalNotice';
+import { useAuth } from '@/lib/auth';
+import { api, useQuery } from '@/lib/backend';
+import { getStoredAuthRole, setStoredAuthRole, type PublicAuthRole } from '@/lib/roleSelection';
+import { captureAuthException } from '@/lib/sentry';
+import { theme } from '@/lib/theme';
+
+const ROLES: Array<{
   role: PublicAuthRole;
   title: string;
   subtitle: string;
-  loginRoute:
-    | '/(auth)/patient/login'
-    | '/(auth)/doctor/login'
-    | '/(auth)/clinic/login';
-  registerRoute:
-    | '/(auth)/patient/register'
-    | '/(auth)/doctor/register'
-    | '/(auth)/clinic/register';
+  icon: keyof typeof Ionicons.glyphMap;
 }> = [
-  {
-    role: 'patient',
-    title: 'عميل',
-    subtitle: 'احجز موعدا وتابع مواعيدك',
-    loginRoute: '/(auth)/patient/login',
-    registerRoute: '/(auth)/patient/register',
-  },
-  {
-    role: 'doctor',
-    title: 'مختص',
-    subtitle: 'أنشئ ملفك المهني',
-    loginRoute: '/(auth)/doctor/login',
-    registerRoute: '/(auth)/doctor/register',
-  },
-  {
-    role: 'clinic',
-    title: 'مركز',
-    subtitle: 'أنشئ حساب المركز وأدر المختصين',
-    loginRoute: '/(auth)/clinic/login',
-    registerRoute: '/(auth)/clinic/register',
-  },
+  { role: 'patient', title: 'عميل', subtitle: 'احجز موعداً وتابع مواعيدك', icon: 'person-outline' },
+  { role: 'doctor', title: 'مختص', subtitle: 'أنشئ ملفك المهني', icon: 'briefcase-outline' },
+  { role: 'clinic', title: 'مركز', subtitle: 'أنشئ حساب المركز وأدر المختصين', icon: 'business-outline' },
 ];
 
-export default function IndexScreen() {
+const ROLE_LABEL: Record<PublicAuthRole, string> = {
+  patient: 'عميل',
+  doctor: 'مختص',
+  clinic: 'مركز',
+};
+
+function homeRoute(role: PublicAuthRole) {
+  if (role === 'patient') return '/(patient)' as const;
+  if (role === 'doctor') return '/(doctor)/dashboard' as const;
+  return '/(clinic)/dashboard' as const;
+}
+
+export default function WelcomeScreen() {
   const router = useRouter();
-  const { isLoaded, isSignedIn } = useAuth();
+  const { isLoaded, isSignedIn, signInWithGoogle } = useAuth();
   const me = useQuery(api.users.me, isSignedIn ? {} : 'skip');
   const [selectedRole, setSelectedRole] = useState<PublicAuthRole | null>(null);
+  const [roleLoaded, setRoleLoaded] = useState(false);
+  const [signingIn, setSigningIn] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    void getStoredAuthRole().then(setSelectedRole);
+    void getStoredAuthRole().then((stored) => {
+      setSelectedRole(stored);
+      setRoleLoaded(true);
+    });
   }, []);
 
+  // Route once we know who is signed in. An existing account's role always wins
+  // over the card that was tapped.
   useEffect(() => {
-    if (!isLoaded || !isSignedIn || me === undefined) return;
-    if (!me) return;
-    if (me.role === 'patient') {
-      router.replace('/(patient)');
-    } else if (me.role === 'doctor') {
-      router.replace('/(doctor)/dashboard');
-    } else if (me.role === 'clinic') {
-      router.replace('/(clinic)/dashboard');
+    if (!isLoaded || !roleLoaded || !isSignedIn || me === undefined) return;
+    if (me) {
+      const role = me.role as PublicAuthRole;
+      if (selectedRole && selectedRole !== role) {
+        Alert.alert('تم تسجيل دخولك', `هذا الحساب مسجل كـ ${ROLE_LABEL[role]}.`);
+      }
+      void setStoredAuthRole(role);
+      router.replace(homeRoute(role));
+      return;
     }
-  }, [isLoaded, isSignedIn, me, router]);
+    // Signed in with Google but no account yet: continue as the chosen role.
+    router.replace('/onboarding');
+  }, [isLoaded, roleLoaded, isSignedIn, me, router, selectedRole]);
 
-  const handleRolePress = async (role: PublicAuthRole) => {
-    await setStoredAuthRole(role);
+  const handleRole = (role: PublicAuthRole) => {
     setSelectedRole(role);
+    void setStoredAuthRole(role);
   };
 
-  const handleAuthRoutePress = (mode: 'login' | 'register') => {
-    const selectedRoleConfig = roles.find((item) => item.role === selectedRole);
-    if (!selectedRoleConfig) return;
-
-    router.push(
-      mode === 'login'
-        ? selectedRoleConfig.loginRoute
-        : selectedRoleConfig.registerRoute,
-    );
+  const handleGoogle = async () => {
+    setError('');
+    setSigningIn(true);
+    try {
+      await signInWithGoogle();
+    } catch (caught) {
+      captureAuthException(caught, { flow: 'google-sign-in', role: selectedRole ?? 'none' });
+      setError('تعذر تسجيل الدخول عبر Google. تحقق من اتصالك وحاول مرة أخرى.');
+    } finally {
+      setSigningIn(false);
+    }
   };
 
-  if (!isLoaded || (isSignedIn && me === undefined)) {
+  if (!isLoaded || !roleLoaded || (isSignedIn && me === undefined)) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
@@ -108,24 +100,19 @@ export default function IndexScreen() {
       </View>
 
       <View style={styles.roles}>
-        {roles.map((item) => {
+        {ROLES.map((item) => {
           const active = selectedRole === item.role;
-          const iconName =
-            item.role === 'patient'
-              ? 'person-outline'
-              : item.role === 'doctor'
-                ? 'person-outline'
-                : 'business-outline';
           return (
             <Pressable
               key={item.role}
               accessibilityRole="button"
-              onPress={() => void handleRolePress(item.role)}
+              accessibilityState={{ selected: active }}
+              onPress={() => handleRole(item.role)}
               style={[styles.roleCard, active && styles.roleCardActive]}
             >
               <View style={[styles.iconShell, active && styles.iconShellActive]}>
                 <Ionicons
-                  name={iconName}
+                  name={item.icon}
                   size={28}
                   color={active ? theme.colors.primary : theme.colors.textPrimary}
                 />
@@ -140,161 +127,80 @@ export default function IndexScreen() {
       </View>
 
       <View style={styles.actions}>
-        <Text style={styles.actionsTitle}>
-          {selectedRole ? 'اختر طريقة المتابعة' : 'اختر نوع الحساب أولاً'}
-        </Text>
-        <View style={styles.actionRow}>
-          <Pressable
-            accessibilityRole="button"
-            disabled={!selectedRole}
-            onPress={() => handleAuthRoutePress('register')}
-            style={[
-              styles.secondaryButton,
-              !selectedRole && styles.actionDisabled,
-            ]}
-          >
-            <Text
-              style={[
-                styles.secondaryButtonText,
-                !selectedRole && styles.actionDisabledText,
-              ]}
-            >
-              إنشاء حساب
-            </Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            disabled={!selectedRole}
-            onPress={() => handleAuthRoutePress('login')}
-            style={[styles.primaryButton, !selectedRole && styles.actionDisabled]}
-          >
-            <Text style={styles.primaryButtonText}>تسجيل الدخول</Text>
-          </Pressable>
-        </View>
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+        <Pressable
+          accessibilityRole="button"
+          disabled={!selectedRole || signingIn}
+          onPress={() => void handleGoogle()}
+          style={[styles.googleButton, (!selectedRole || signingIn) && styles.disabled]}
+        >
+          {signingIn ? (
+            <ActivityIndicator color={theme.colors.textPrimary} />
+          ) : (
+            <>
+              <Ionicons name="logo-google" size={20} color={theme.colors.textPrimary} />
+              <Text style={styles.googleText}>المتابعة باستخدام Google</Text>
+            </>
+          )}
+        </Pressable>
+        {!selectedRole ? <Text style={styles.pickHint}>اختر نوع الحساب أولاً</Text> : null}
+        <LegalNotice />
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.colors.background,
-  },
   container: {
     flex: 1,
-    justifyContent: 'center',
-    padding: theme.spacing.lg,
     backgroundColor: theme.colors.background,
+    paddingHorizontal: theme.spacing.lg,
+    paddingTop: 72,
+    paddingBottom: theme.spacing['2xl'],
+    justifyContent: 'space-between',
   },
-  header: {
-    marginBottom: theme.spacing.xl,
-    gap: theme.spacing.sm,
-  },
-  kicker: {
-    fontFamily: 'Cairo-Bold',
-    fontSize: 18,
-    color: theme.colors.primary,
-    textAlign: 'center',
-  },
-  title: {
-    fontFamily: 'Cairo-Bold',
-    fontSize: 28,
-    color: theme.colors.textPrimary,
-    textAlign: 'right',
-  },
-  roles: {
-    gap: theme.spacing.md,
-  },
-  actions: {
-    marginTop: theme.spacing.xl,
-    gap: theme.spacing.md,
-  },
-  actionsTitle: {
-    fontFamily: 'Cairo-Bold',
-    fontSize: 16,
-    color: theme.colors.textSecondary,
-    textAlign: 'right',
-  },
-  actionRow: {
-    flexDirection: 'row',
-    gap: theme.spacing.md,
-  },
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.background },
+  header: { gap: theme.spacing.xs, alignItems: 'center' },
+  kicker: { fontFamily: 'Cairo-Bold', fontSize: 34, color: theme.colors.official },
+  title: { fontFamily: 'Cairo-Bold', fontSize: 22, color: theme.colors.textPrimary },
+  roles: { gap: theme.spacing.md },
   roleCard: {
-    minHeight: 112,
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.spacing.md,
     padding: theme.spacing.lg,
-    borderRadius: theme.borderRadius.lg,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.sm,
+    backgroundColor: theme.colors.surfaceRaised,
   },
-  roleCardActive: {
-    borderColor: theme.colors.primary,
-  },
+  roleCardActive: { borderColor: theme.colors.primary, backgroundColor: theme.colors.secondary },
   iconShell: {
     width: 52,
     height: 52,
-    borderRadius: theme.borderRadius.md,
+    borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: theme.colors.background,
+    backgroundColor: theme.colors.surfaceMuted,
   },
-  iconShellActive: {
-    backgroundColor: theme.colors.secondary,
-  },
-  roleCopy: {
-    flex: 1,
-    gap: 4,
-  },
-  roleTitle: {
-    fontFamily: 'Cairo-Bold',
-    fontSize: 20,
-    color: theme.colors.textPrimary,
-    textAlign: 'right',
-  },
-  roleSubtitle: {
-    fontFamily: 'Cairo-Regular',
-    fontSize: 14,
-    color: theme.colors.textSecondary,
-    textAlign: 'right',
-  },
-  primaryButton: {
-    flex: 1,
-    minHeight: 52,
+  iconShellActive: { backgroundColor: theme.colors.white },
+  roleCopy: { flex: 1, gap: 2 },
+  roleTitle: { fontFamily: 'Cairo-Bold', fontSize: 18, color: theme.colors.textPrimary, textAlign: 'right' },
+  roleSubtitle: { fontFamily: 'Cairo-Regular', color: theme.colors.textSecondary, textAlign: 'right' },
+  actions: { gap: theme.spacing.md },
+  googleButton: {
+    minHeight: 54,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: theme.borderRadius.sm,
-    backgroundColor: theme.colors.primary,
-  },
-  primaryButtonText: {
-    fontFamily: 'Cairo-Bold',
-    fontSize: 16,
-    color: theme.colors.white,
-  },
-  secondaryButton: {
-    flex: 1,
-    minHeight: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: theme.borderRadius.sm,
+    gap: theme.spacing.sm,
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.borderStrong,
+    borderRadius: theme.borderRadius.sm,
+    backgroundColor: theme.colors.surfaceRaised,
   },
-  secondaryButtonText: {
-    fontFamily: 'Cairo-Bold',
-    fontSize: 16,
-    color: theme.colors.textPrimary,
-  },
-  actionDisabled: {
-    opacity: 0.5,
-  },
-  actionDisabledText: {
-    color: theme.colors.textSecondary,
-  },
+  googleText: { fontFamily: 'Cairo-Bold', fontSize: 16, color: theme.colors.textPrimary },
+  disabled: { opacity: 0.5 },
+  pickHint: { fontFamily: 'Cairo-Regular', color: theme.colors.textSecondary, textAlign: 'center' },
+  error: { fontFamily: 'Cairo-Regular', color: theme.colors.danger, textAlign: 'center' },
 });

@@ -60,6 +60,12 @@
           "project": "android",
           "organization": "samir-saadi-org"
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "نستخدم موقعك مرة واحدة فقط لتحديد مكان المركز على الخريطة."
+        }
       ]
     ]
   }

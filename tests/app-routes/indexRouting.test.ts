@@ -5,34 +5,32 @@ import { describe, expect, test } from 'vitest';
 const indexSource = () =>
   readFileSync(join(process.cwd(), 'app/index.tsx'), 'utf8');
 
-describe('root role choice', () => {
-  test('renders role choice for signed-out users', () => {
+describe('welcome screen (role first, Google only)', () => {
+  test('renders role cards and a single Google button', () => {
     const source = indexSource();
     expect(source).toContain('اختر نوع الحساب');
     expect(source).toContain('عميل');
     expect(source).toContain('مختص');
     expect(source).toContain('مركز');
     expect(source).toContain('setStoredAuthRole');
-    expect(source).toContain('تسجيل الدخول');
-    expect(source).toContain('إنشاء حساب');
-    expect(source).toContain("loginRoute: '/(auth)/patient/login'");
-    expect(source).toContain("registerRoute: '/(auth)/patient/register'");
-    expect(source).toContain("loginRoute: '/(auth)/doctor/login'");
-    expect(source).toContain("registerRoute: '/(auth)/doctor/register'");
-    expect(source).toContain("loginRoute: '/(auth)/clinic/login'");
-    expect(source).toContain("registerRoute: '/(auth)/clinic/register'");
-    expect(source).not.toContain('/(auth)/onboarding');
-    expect(source).not.toContain('/complete-profile');
+    expect(source).toContain('signInWithGoogle');
+    expect(source).toContain('المتابعة باستخدام Google');
+    expect(source).toContain('<LegalNotice />');
+    expect(source).not.toMatch(/password|كلمة المرور|register|login/i);
   });
 
-  test('routes signed-in users by backend role', () => {
+  test('routes signed-in users by backend role and sends new accounts to onboarding', () => {
     const source = indexSource();
     expect(source).toContain('api.users.me');
-    expect(source).toContain("me.role === 'patient'");
-    expect(source).toContain("router.replace('/(patient)')");
-    expect(source).toContain("me.role === 'doctor'");
-    expect(source).toContain("router.replace('/(doctor)/dashboard')");
-    expect(source).toContain("me.role === 'clinic'");
-    expect(source).toContain("router.replace('/(clinic)/dashboard')");
+    expect(source).toContain("'/(patient)'");
+    expect(source).toContain("'/(doctor)/dashboard'");
+    expect(source).toContain("'/(clinic)/dashboard'");
+    expect(source).toContain("router.replace('/onboarding')");
+  });
+
+  test('an existing account role wins over the tapped card', () => {
+    const source = indexSource();
+    expect(source).toContain('selectedRole !== role');
+    expect(source).toContain('هذا الحساب مسجل كـ');
   });
 });

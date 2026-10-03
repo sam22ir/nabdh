@@ -19,10 +19,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useClerk } from '@clerk/clerk-expo';
-import { useMutation, useQuery } from 'convex/react';
+import { useAuth } from '@/lib/auth';
+import { useMutation, useQuery } from '@/lib/backend';
 
-import { api } from '@/convex/_generated/api';
+import { api } from '@/lib/backend/api';
 import { DoctorHeader } from '@/components/doctor-ui';
 import { LoadingState, Panel } from '@/components/ui';
 import { theme } from '@/lib/theme';
@@ -30,7 +30,7 @@ import { rtlTextAlign } from '@/lib/rtl';
 import { getArabicErrorMessage } from '@/lib/errorMessages';
 import { useAuthStore } from '@/stores/authStore';
 import type { PatientProfile } from '@/lib/types';
-import type { Id } from '@/convex/_generated/dataModel';
+import type { Id } from '@/lib/backend/types';
 
 // =============================================================================
 // Helpers
@@ -278,7 +278,7 @@ const FamilyProfileItem: React.FC<FamilyProfileItemProps> = ({
 
 export default function PatientProfileScreen() {
   const router = useRouter();
-  const { signOut } = useClerk();
+  const { signOut } = useAuth();
   const me = useQuery(api.users.me, {});
   const familyProfilesQuery = useQuery(api.patientProfiles.listMy, {});
   const wilayasQuery = useQuery(api.locations.listWilayas, {});
