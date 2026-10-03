@@ -1,7 +1,6 @@
 # Google-only onboarding (agreed with the owner, 2026-10-03)
 
-Status: **agreed in chat, not built.** Open points at the bottom need an answer
-before implementation starts. Supersedes the Clerk email/password flow and
+Status: **fully agreed with the owner; implementation started 2026-10-03.** Supersedes the Clerk email/password flow and
 `2026-07-01-google-auth-profile-completion-plan.md`.
 
 ## Principles
@@ -24,7 +23,7 @@ before implementation starts. Supersedes the Clerk email/password flow and
 |---|---|
 | Client | Nothing. Straight into search. |
 | Specialist | Specialty + wilaya, then the "do you work alone?" pop-up. |
-| Center | Center name + wilaya. Location (optional, see below). Phone optional. |
+| Center | Center name + wilaya + **location (required)**. Phone optional. |
 
 ### Center location (two ways, no Google Maps)
 1. **Use my current location** (device GPS, foreground permission only); the
@@ -39,7 +38,7 @@ OSM tile server has a fair-use policy; switch tile provider if traffic grows.
 - After creating a specialist account, a pop-up asks: **"Do you work alone?"**
 - If yes: the app creates a **solo center** owned by the same account
   (name defaults to the specialist's name, editable; wilaya copied; location
-  optional), plus an accepted membership so the specialist is bookable
+  required like any center), plus an accepted membership so the specialist is bookable
   immediately. One Google account holds **both roles**.
 - **Settings has a "switch role" button** (specialist view <-> center view).
 - Solo centers are hidden from the public "centers" list; patients find the
@@ -66,15 +65,13 @@ OSM tile server has a fair-use policy; switch tile provider if traffic grows.
 ## Later phase (agreed "ok")
 - Center invites a specialist with a WhatsApp share link + code.
 
-## Open points
-1. Is the center **location required or optional**? (Proposed: optional, nudged
-   from a checklist, since search is by wilaya.)
-2. How patients **open** a center's location: proposed `geo:` link (opens
-   whatever maps app is installed) with an OSM link fallback, replacing the
-   current "open in Google Maps" button.
-3. **Default schedule** for new specialists (Sun-Thu 09:00-16:00, 30 min,
-   one-tap confirm). Assumed yes.
-4. **Play Console:** device location must be declared in Data safety and
-   mentioned in the privacy policy.
-5. With phone optional everywhere, appointment reminders rely on push
-   notifications only.
+## Decisions on the former open points
+1. Center location is **required** (all centers, including solo ones).
+2. Patients open a center's location with a `geo:` link (any installed maps
+   app) with an OpenStreetMap link as fallback; the "open in Google Maps"
+   button goes away.
+3. New specialists get the pre-filled default schedule (Sun-Thu 09:00-16:00,
+   30 min), confirmed with one tap.
+4. Owner declares device location in Play Console Data safety and the privacy
+   policy mentions it (owner task at release).
+5. Reminders rely on app notifications only (phone is optional).

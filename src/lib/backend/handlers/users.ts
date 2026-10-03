@@ -91,9 +91,12 @@ export const users = {
       args: {
         clinicName: string;
         wilayaId: string | number;
-        phone: string;
+        latitude: number;
+        longitude: number;
         termsVersion: string;
         privacyVersion: string;
+        phone?: string;
+        address?: string;
         fullName?: string;
       },
     ) => {
@@ -102,10 +105,32 @@ export const users = {
         await ctx.db.rpc('onboard_clinic', {
           p_clinic_name: args.clinicName,
           p_wilaya_id: wilayaIdToSql(args.wilayaId),
-          p_phone: args.phone,
+          p_latitude: args.latitude,
+          p_longitude: args.longitude,
           p_terms_version: args.termsVersion,
           p_privacy_version: args.privacyVersion,
+          p_phone: args.phone ?? null,
+          p_address: args.address ?? null,
           p_full_name: args.fullName ?? null,
+        }),
+      );
+    },
+  ),
+
+  /** Specialist who works alone: creates the personal center they get booked at. */
+  createSoloPractice: mutation(
+    async (
+      ctx,
+      args: { latitude: number; longitude: number; name?: string; phone?: string; address?: string },
+    ) => {
+      requireUser(ctx);
+      return unwrap(
+        await ctx.db.rpc('create_solo_practice', {
+          p_latitude: args.latitude,
+          p_longitude: args.longitude,
+          p_name: args.name ?? null,
+          p_phone: args.phone ?? null,
+          p_address: args.address ?? null,
         }),
       );
     },

@@ -79,6 +79,9 @@ const SQL_ERROR_MESSAGES: Record<string, { code?: string; message: string }> = {
   terms_required: { message: 'You must accept the terms and privacy policy' },
   invalid_state: { message: 'This action is not allowed in the current state' },
   too_late: { message: 'Too late to cancel this appointment' },
+  location_required: { message: 'Location is required' },
+  wilaya_required: { message: 'Wilaya is required' },
+  already_exists: { message: 'Already exists' },
 };
 
 export function fail(error: PostgrestError | { message: string }): never {
