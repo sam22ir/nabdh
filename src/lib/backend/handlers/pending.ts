@@ -7,30 +7,6 @@ const todo = (name: string) => async (): Promise<any> => {
 };
 
 export const pending = {
-  bookings: {
-    cancel: mutation<any, any>(todo('bookings.cancel')),
-    countMyClinicBookedAppointments: query<any, any>(todo('bookings.countMyClinicBookedAppointments')),
-    countMyClinicDoctorsAvailableToday: query<any, any>(todo('bookings.countMyClinicDoctorsAvailableToday')),
-    create: mutation<any, any>(todo('bookings.create')),
-    getAvailableSlots: query<any, any>(todo('bookings.getAvailableSlots')),
-    getHomeData: query<any, any>(todo('bookings.getHomeData')),
-    getHomeDataDoctor: query<any, any>(todo('bookings.getHomeDataDoctor')),
-    listClinicHistory: query<any, any>(todo('bookings.listClinicHistory')),
-    listDoctorHistory: query<any, any>(todo('bookings.listDoctorHistory')),
-    listDoctorMonth: query<any, any>(todo('bookings.listDoctorMonth')),
-    listDoctorToday: query<any, any>(todo('bookings.listDoctorToday')),
-    listDoctorWeek: query<any, any>(todo('bookings.listDoctorWeek')),
-    listMyCancelled: query<any, any>(todo('bookings.listMyCancelled')),
-    listMyClinicAppointments: query<any, any>(todo('bookings.listMyClinicAppointments')),
-    listMyPast: query<any, any>(todo('bookings.listMyPast')),
-    listMyUpcoming: query<any, any>(todo('bookings.listMyUpcoming')),
-    markCompleted: mutation<any, any>(todo('bookings.markCompleted')),
-    markNoShow: mutation<any, any>(todo('bookings.markNoShow')),
-    markPresent: mutation<any, any>(todo('bookings.markPresent')),
-    reschedule: mutation<any, any>(todo('bookings.reschedule')),
-    syncMyClinicAppointmentStates: mutation<any, any>(todo('bookings.syncMyClinicAppointmentStates')),
-    updateDoctorNote: mutation<any, any>(todo('bookings.updateDoctorNote')),
-  },
   clinicMemberships: {
     accept: mutation<any, any>(todo('clinicMemberships.accept')),
     cancel: mutation<any, any>(todo('clinicMemberships.cancel')),

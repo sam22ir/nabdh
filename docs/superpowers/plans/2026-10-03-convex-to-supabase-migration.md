@@ -157,3 +157,14 @@ encounterNotes, patientProfiles) and delete the entry as you go. Also needed:
 Edge Function for push delivery, `pg_cron` jobs, and removing `convex/` at
 cutover. Drop the disabled legacy `onboard_clinic(text, smallint, text, text,
 text, text)` overload when convenient.
+
+**Phase 4a - bookings module ported (2026-10-03).** All 22 `bookings.*`
+functions now run on Supabase (`src/lib/backend/handlers/bookings.ts`):
+patient lists/home, specialist today/week/month/home/history, center list/
+history/counters, create/reschedule/cancel, status changes, doctor note,
+slots, and attendance sync. New SQL: `reschedule_booking`,
+`sync_clinic_attendance` (+ `private.process_clinic_attendance`, to be run by
+`pg_cron` later), `count_clinic_doctors_working`. Verified with
+`supabase/tests/booking_lifecycle.sql`. `clinic_settings.auto_complete_appointments`
+now defaults to true like the old backend. 51 functions remain in
+`handlers/pending.ts`.

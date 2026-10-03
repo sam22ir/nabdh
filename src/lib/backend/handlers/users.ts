@@ -5,7 +5,7 @@ import { supabase } from '../../supabase';
 
 export const ACTIVE_MODE_KEY = 'nabdh.activeMode';
 
-async function loadMe(userId: string): Promise<any> {
+export async function loadMe(userId: string): Promise<any> {
   const [{ data: profile }, { data: priv }] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
     supabase.from('profile_private').select('*').eq('user_id', userId).maybeSingle(),
