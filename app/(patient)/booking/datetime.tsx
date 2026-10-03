@@ -486,7 +486,7 @@ export default function BookingDateTimeScreen() {
         />
         <Text style={styles.errorTitle}>رابط غير صالح</Text>
         <Text style={styles.errorMessage}>
-          بيانات الطبيب أو العيادة غير مكتملة. يرجى العودة والمحاولة مرة أخرى.
+          بيانات المختص أو المركز غير مكتملة. يرجى العودة والمحاولة مرة أخرى.
         </Text>
         <Pressable
           style={({ pressed }) => [styles.retryButton, pressed && { opacity: 0.85 }]}
@@ -518,7 +518,7 @@ export default function BookingDateTimeScreen() {
         />
         <Text style={styles.errorTitle}>عذراً، حدث خطأ</Text>
         <Text style={styles.errorMessage}>
-          تعذر تحميل معلومات الطبيب أو العيادة.
+          تعذر تحميل معلومات المختص أو المركز.
         </Text>
         <Pressable
           style={({ pressed }) => [styles.retryButton, pressed && { opacity: 0.85 }]}

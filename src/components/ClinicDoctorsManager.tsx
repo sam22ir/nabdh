@@ -38,8 +38,8 @@ type DoctorSearchCard = {
 
 function doctorDisplayName(doctor: DoctorSearchCard | MembershipCard) {
   return 'doctorName' in doctor
-    ? doctor.doctorName || 'طبيب'
-    : doctor.fullNameAr ?? doctor.fullName ?? 'طبيب';
+    ? doctor.doctorName || 'مختص'
+    : doctor.fullNameAr ?? doctor.fullName ?? 'مختص';
 }
 
 function DoctorResultRow({
@@ -70,7 +70,7 @@ function DoctorResultRow({
           </View>
           <View style={styles.rowCopy}>
             {isMember ? (
-              <Text style={styles.memberEyebrow}>طبيب داخل العيادة</Text>
+              <Text style={styles.memberEyebrow}>مختص داخل المركز</Text>
             ) : null}
             <View style={[styles.titleRow, isMember && styles.memberTitleRow]}>
               <Text style={styles.rowTitle} numberOfLines={1}>
@@ -226,7 +226,7 @@ export default function ClinicDoctorsManager() {
 
   return (
     <>
-      <DoctorSection title="إدارة الأطباء">
+      <DoctorSection title="إدارة المختصين">
         <SearchBar
           value={searchText}
           onChangeText={setSearchText}
@@ -252,7 +252,7 @@ export default function ClinicDoctorsManager() {
                 meta={doctor.phone ?? undefined}
                 badge={
                   isAccepted ? (
-                    <Badge label="داخل العيادة" tone="success" />
+                    <Badge label="داخل المركز" tone="success" />
                   ) : hasRequest ? (
                     <Badge label="طلب وارد" tone="warning" />
                   ) : hasInvite ? (
@@ -295,7 +295,7 @@ export default function ClinicDoctorsManager() {
         <View style={styles.combinedSection}>
           <View style={styles.subsection}>
             <View style={styles.subsectionHeader}>
-              <Text style={styles.subsectionTitle}>طلبات الأطباء</Text>
+              <Text style={styles.subsectionTitle}>طلبات المختصين</Text>
               <Badge
                 label={`${(requests ?? []).length}`}
                 tone={(requests ?? []).length > 0 ? 'warning' : 'neutral'}
@@ -306,7 +306,7 @@ export default function ClinicDoctorsManager() {
                 <DoctorResultRow
                   key={membership._id}
                   title={membership.doctorName}
-                  subtitle={membership.doctorPhone || 'يريد الانضمام إلى العيادة'}
+                  subtitle={membership.doctorPhone || 'يريد الانضمام إلى المركز'}
                   badge={<Badge label="بانتظار القرار" tone="warning" />}
                   actions={
                     <>
@@ -347,7 +347,7 @@ export default function ClinicDoctorsManager() {
                 <DoctorResultRow
                   key={membership._id}
                   title={membership.doctorName}
-                  subtitle={membership.doctorPhone || 'بانتظار قبول الطبيب'}
+                  subtitle={membership.doctorPhone || 'بانتظار قبول المختص'}
                   badge={<Badge label="دعوة معلقة" tone="info" />}
                   actions={
                     <Button
@@ -367,13 +367,13 @@ export default function ClinicDoctorsManager() {
         </View>
       </DoctorSection>
 
-      <DoctorSection title="الأطباء المقبولون">
+      <DoctorSection title="المختصون المقبولون">
         {(doctors ?? []).length > 0 ? (
           doctors?.map((membership) => (
             <DoctorResultRow
               key={membership._id}
               title={membership.doctorName}
-              subtitle="عضو نشط ضمن أطباء العيادة"
+              subtitle="عضو نشط ضمن مختصي المركز"
               meta={membership.doctorPhone || undefined}
               variant="member"
               badge={<Badge label="نشط" tone="success" />}
@@ -395,7 +395,7 @@ export default function ClinicDoctorsManager() {
             />
           ))
         ) : (
-          <Text style={styles.emptyText}>لا يوجد أطباء داخل العيادة حالياً</Text>
+          <Text style={styles.emptyText}>لا يوجد مختصون داخل المركز حالياً</Text>
         )}
       </DoctorSection>
 
@@ -415,8 +415,8 @@ export default function ClinicDoctorsManager() {
             </View>
             <Text style={styles.modalTitle}>تأكيد إنهاء العضوية</Text>
             <Text style={styles.modalMessage}>
-              سيتم إنهاء عضوية {doctorPendingRemoval?.doctorName ?? 'هذا الطبيب'} وإلغاء
-              المواعيد المستقبلية المرتبطة به داخل العيادة.
+              سيتم إنهاء عضوية {doctorPendingRemoval?.doctorName ?? 'هذا المختص'} وإلغاء
+              المواعيد المستقبلية المرتبطة به داخل المركز.
             </Text>
             <View style={styles.modalActions}>
               <Button

@@ -46,7 +46,7 @@ export default function DoctorLoginScreen() {
         return;
       }
       if (account.role !== 'doctor') {
-        setError('هذا الحساب ليس حساب طبيب');
+        setError('هذا الحساب ليس حساب مختص');
         return;
       }
       const clerkIdentifier = buildClerkPasswordIdentifierFromLoginKey(
@@ -68,7 +68,7 @@ export default function DoctorLoginScreen() {
         await signOut();
         setError(
           resolution.reason === 'role_mismatch'
-            ? 'هذا الحساب ليس حساب طبيب'
+            ? 'هذا الحساب ليس حساب مختص'
             : 'استخدم نفس رقم الهاتف المسجل',
         );
         return;
@@ -85,7 +85,7 @@ export default function DoctorLoginScreen() {
   return (
     <View style={styles.container}>
       <AuthBackButton />
-      <Text style={styles.title}>دخول الطبيب</Text>
+      <Text style={styles.title}>دخول المختص</Text>
       <TextInput value={phone} onChangeText={setPhone} placeholder="رقم الهاتف" keyboardType="phone-pad" style={styles.input} />
       <TextInput value={password} onChangeText={setPassword} placeholder="كلمة المرور" secureTextEntry style={styles.input} />
       {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -95,7 +95,7 @@ export default function DoctorLoginScreen() {
       <Link href={{ pathname: '/(auth)/forgot-password', params: { role: 'doctor' } }} style={styles.link}>
         نسيت كلمة المرور؟
       </Link>
-      <Link href="/(auth)/doctor/register" style={styles.link}>إنشاء حساب طبيب</Link>
+      <Link href="/(auth)/doctor/register" style={styles.link}>إنشاء حساب مختص</Link>
     </View>
   );
 }

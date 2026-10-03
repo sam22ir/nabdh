@@ -55,12 +55,12 @@ describe('clinic app route tree', () => {
 
     expect(source).toContain('api.bookings.countMyClinicDoctorsAvailableToday');
     expect(source).toContain('api.bookings.countMyClinicBookedAppointments');
-    expect(source).toContain('الأطباء المتاحون للحجز اليوم');
+    expect(source).toContain('المختصون المتاحون للحجز اليوم');
     expect(source).toContain('إجمالي المواعيد المحجوزة');
     expect(source).not.toContain('طلبات معلقة');
     expect(source).not.toContain('api.clinicMemberships.listMyClinicDoctors');
     expect(source).not.toContain('api.users.me');
-    expect(source).not.toContain('بيانات العيادة');
+    expect(source).not.toContain('بيانات المركز');
     expect(source).not.toContain('DoctorSection');
   });
 
@@ -75,9 +75,9 @@ describe('clinic app route tree', () => {
     expect(source).toContain('api.schedules.removeException');
     expect(source).toContain('DoctorHeader');
     expect(source).toContain('DoctorSection');
-    expect(source).toContain('اختر الطبيب');
+    expect(source).toContain('اختر المختص');
     expect(source).toContain('الجدول الأسبوعي');
-    expect(source).toContain('استثناءات الطبيب');
+    expect(source).toContain('استثناءات المختص');
     expect(source).toContain('single_hour');
     expect(source).toContain('time_range');
     expect(source).toContain('multi_day');
@@ -98,15 +98,15 @@ describe('clinic app route tree', () => {
     expect(source).toContain('selectedAppointment');
     expect(source).toContain('تفاصيل الموعد');
     expect(source).toContain('selectedDoctorId');
-    expect(source).toContain('اختر الطبيب');
+    expect(source).toContain('اختر المختص');
     expect(source).toContain('doctorChips');
     expect(source).toContain('doctorName');
     expect(source).toContain('patientName');
     expect(source).toContain('حاضر');
-    expect(source).toContain('داخل عند الطبيب');
+    expect(source).toContain('داخل عند المختص');
     expect(source).toContain('تم');
     expect(source).toContain('غائب');
-    expect(source).not.toContain('تظهر هنا مواعيد الأطباء المقبولين داخل العيادة.');
+    expect(source).not.toContain('تظهر هنا مواعيد المختصين المقبولين داخل المركز.');
   });
 
   test('clinic settings screen exposes automatic completion control', () => {

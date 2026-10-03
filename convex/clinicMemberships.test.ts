@@ -41,7 +41,7 @@ async function seedClinicDoctorPair(t: ReturnType<typeof convexTest>) {
     });
     const clinicUserId = await ctx.db.insert('users', {
       tokenIdentifier: 'clerk|membership-clinic',
-      fullName: 'عيادة العضوية',
+      fullName: 'مركز العضوية',
       role: 'clinic',
       phone: '+213555500000',
       phoneNormalized: '+213555500000',
@@ -50,7 +50,7 @@ async function seedClinicDoctorPair(t: ReturnType<typeof convexTest>) {
     });
     const clinicId = await ctx.db.insert('clinics', {
       ownerUserId: clinicUserId,
-      name: 'عيادة العضوية',
+      name: 'مركز العضوية',
       wilayaId,
       phone: '+213555500000',
       isActive: true,
@@ -99,13 +99,13 @@ describe('clinic memberships', () => {
       clinicId: seeded.clinicId,
       doctorId: seeded.doctorId,
       status: 'accepted',
-      clinicName: 'عيادة العضوية',
+      clinicName: 'مركز العضوية',
     });
 
     const secondClinicUserId = await t.run((ctx) =>
       ctx.db.insert('users', {
         tokenIdentifier: 'clerk|membership-clinic-2',
-        fullName: 'عيادة ثانية',
+        fullName: 'مركز ثانية',
         role: 'clinic',
         phone: '+213555500001',
         phoneNormalized: '+213555500001',
@@ -116,7 +116,7 @@ describe('clinic memberships', () => {
     const secondClinicId = await t.run((ctx) =>
       ctx.db.insert('clinics', {
         ownerUserId: secondClinicUserId,
-        name: 'عيادة ثانية',
+        name: 'مركز ثانية',
         wilayaId: seeded.wilayaId,
         phone: '+213555500001',
         isActive: true,
@@ -162,7 +162,7 @@ describe('clinic memberships', () => {
       {
         userId: seeded.doctorUserId,
         type: 'clinic_invite',
-        title: 'دعوة للانضمام إلى عيادة',
+        title: 'دعوة للانضمام إلى مركز',
       },
     ]);
 
@@ -190,7 +190,7 @@ describe('clinic memberships', () => {
     const patient = await t.run(async (ctx) => {
       const patientUserId = await ctx.db.insert('users', {
         tokenIdentifier: 'clerk|membership-patient',
-        fullName: 'مريض العضوية',
+        fullName: 'عميل العضوية',
         gender: 'female',
         role: 'patient',
         phone: '+213555600000',
@@ -232,7 +232,7 @@ describe('clinic memberships', () => {
       .withIdentity(identity('clerk|membership-clinic'))
       .mutation(api.clinicMemberships.removeDoctor, {
         doctorId: seeded.doctorId,
-        reason: 'تم إنهاء عضوية الطبيب في العيادة',
+        reason: 'تم إنهاء عضوية المختص في المركز',
       });
 
     const result = await t.run(async (ctx) => ({
@@ -251,13 +251,13 @@ describe('clinic memberships', () => {
     expect(result.booking).toMatchObject({
       status: 'cancelled',
       cancelledBy: 'system',
-      cancellationReason: 'تم إنهاء عضوية الطبيب في العيادة',
+      cancellationReason: 'تم إنهاء عضوية المختص في المركز',
     });
     expect(result.notifications).toMatchObject([
       {
         type: 'booking_cancelled',
         title: 'تم إلغاء الموعد',
-        body: expect.stringContaining('تم إنهاء عضوية الطبيب في العيادة'),
+        body: expect.stringContaining('تم إنهاء عضوية المختص في المركز'),
       },
     ]);
   });

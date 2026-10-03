@@ -30,7 +30,7 @@ async function seedDoctorWorklist(t: ReturnType<typeof convexTest>) {
     });
     const doctorUserId = await ctx.db.insert('users', {
       tokenIdentifier: 'clerk|doctor-worklist',
-      fullName: 'طبيب المواعيد',
+      fullName: 'مختص المواعيد',
       gender: 'male',
       role: 'doctor',
       phone: '+213555100000',
@@ -50,7 +50,7 @@ async function seedDoctorWorklist(t: ReturnType<typeof convexTest>) {
     });
     const patientUserId = await ctx.db.insert('users', {
       tokenIdentifier: 'clerk|patient-worklist',
-      fullName: 'مريض المواعيد',
+      fullName: 'عميل المواعيد',
       gender: 'female',
       role: 'patient',
       phone: '+213555200000',
@@ -69,7 +69,7 @@ async function seedDoctorWorklist(t: ReturnType<typeof convexTest>) {
     });
     const clinicId = await ctx.db.insert('clinics', {
       doctorId,
-      name: 'عيادة المواعيد',
+      name: 'مركز المواعيد',
       wilayaId,
       address: 'شارع الاختبار',
       latitude: 36.75,
@@ -118,7 +118,7 @@ async function seedClinicBookingMemberships(t: ReturnType<typeof convexTest>) {
     });
     const clinicUserId = await ctx.db.insert('users', {
       tokenIdentifier: 'clerk|booking-clinic',
-      fullName: 'عيادة الحجز',
+      fullName: 'مركز الحجز',
       role: 'clinic',
       phone: '+213555700000',
       phoneNormalized: '+213555700000',
@@ -127,7 +127,7 @@ async function seedClinicBookingMemberships(t: ReturnType<typeof convexTest>) {
     });
     const clinicId = await ctx.db.insert('clinics', {
       ownerUserId: clinicUserId,
-      name: 'عيادة الحجز',
+      name: 'مركز الحجز',
       wilayaId,
       phone: '+213555700000',
       isActive: true,
@@ -170,7 +170,7 @@ async function seedClinicBookingMemberships(t: ReturnType<typeof convexTest>) {
     });
     const patientUserId = await ctx.db.insert('users', {
       tokenIdentifier: 'clerk|booking-patient',
-      fullName: 'مريض الحجز',
+      fullName: 'عميل الحجز',
       gender: 'female',
       role: 'patient',
       phone: '+213555700003',
@@ -241,7 +241,7 @@ describe('doctor booking worklist queries', () => {
       .query(api.bookings.listDoctorMonth, {
         year: 2026,
         month: 7,
-        query: 'مريض',
+        query: 'عميل',
         status: 'confirmed',
         visitType: 'consultation',
       });
@@ -256,7 +256,7 @@ describe('doctor booking worklist queries', () => {
           appointments: [
             {
               _id: seeded.julyBookingId,
-              patientName: 'مريض المواعيد',
+              patientName: 'عميل المواعيد',
               patientPhone: '+213555200000',
             },
           ],
@@ -321,13 +321,13 @@ describe('doctor booking worklist queries', () => {
       nextPatient: {
         _id: bookingId,
         status: 'confirmed',
-        patientName: 'مريض المواعيد',
+        patientName: 'عميل المواعيد',
       },
       todayAppointments: [
         {
           _id: bookingId,
           status: 'confirmed',
-          patientName: 'مريض المواعيد',
+          patientName: 'عميل المواعيد',
         },
       ],
     });
@@ -336,7 +336,7 @@ describe('doctor booking worklist queries', () => {
       .run(async (ctx) => {
         const clinicUserId = await ctx.db.insert('users', {
           tokenIdentifier: 'clerk|doctor-worklist-clinic',
-          fullName: 'عيادة المواعيد',
+          fullName: 'مركز المواعيد',
           role: 'clinic',
           phone: '+213555100111',
           phoneNormalized: '+213555100111',
@@ -371,7 +371,7 @@ describe('doctor booking worklist queries', () => {
         {
           _id: bookingId,
           status: 'completed',
-          patientName: 'مريض المواعيد',
+          patientName: 'عميل المواعيد',
         },
       ],
     });
@@ -401,7 +401,7 @@ describe('doctor booking worklist queries', () => {
       .withIdentity(identity('clerk|doctor-worklist'))
       .mutation(api.bookings.cancel, {
         bookingId,
-        cancellationReason: 'إلغاء من الطبيب',
+        cancellationReason: 'إلغاء من المختص',
       });
 
     const doctorDashboard = await t
@@ -421,7 +421,7 @@ describe('doctor booking worklist queries', () => {
           _id: bookingId,
           status: 'cancelled',
           cancelledBy: 'doctor',
-          cancellationReason: 'إلغاء من الطبيب',
+          cancellationReason: 'إلغاء من المختص',
         },
       ],
     });
@@ -433,7 +433,7 @@ describe('doctor booking worklist queries', () => {
         _id: bookingId,
         status: 'cancelled',
         cancelledBy: 'doctor',
-        cancellationReason: 'إلغاء من الطبيب',
+        cancellationReason: 'إلغاء من المختص',
       },
     ]);
 
@@ -573,7 +573,7 @@ describe('doctor booking worklist queries', () => {
         clinicId: seeded.clinicId,
         doctorId: seeded.firstDoctorId,
         exceptionDate: '2099-07-06',
-        reason: 'اجتماع داخل العيادة',
+        reason: 'اجتماع داخل المركز',
         exceptionType: 'time_range',
         customStartTime: '09:00',
         customEndTime: '10:00',
@@ -671,9 +671,9 @@ describe('patient home booking data', () => {
       .query(api.bookings.getHomeData, {});
 
     expect(result.nextAppointment).toMatchObject({
-      doctorName: 'طبيب المواعيد',
-      doctorSpecialtyNameAr: 'طب القلب',
-      clinicName: 'عيادة المواعيد',
+      doctorName: 'مختص المواعيد',
+      doctorSpecialtyNameAr: 'القلب',
+      clinicName: 'مركز المواعيد',
       appointmentDate: '2026-07-14',
       appointmentTime: '09:30',
     });
@@ -696,7 +696,7 @@ describe('patient home booking data', () => {
       });
       const doctorUserId = await ctx.db.insert('users', {
         tokenIdentifier: 'clerk|fallback-doctor',
-        fullName: 'د. العيادة',
+        fullName: 'د. المركز',
         gender: 'male',
         role: 'doctor',
         phone: '+213555810001',
@@ -714,7 +714,7 @@ describe('patient home booking data', () => {
       });
       const patientUserId = await ctx.db.insert('users', {
         tokenIdentifier: 'clerk|fallback-patient',
-        fullName: 'مريض العيادة',
+        fullName: 'عميل المركز',
         gender: 'female',
         role: 'patient',
         phone: '+213555810002',
@@ -736,7 +736,7 @@ describe('patient home booking data', () => {
       });
       const actualClinicId = await ctx.db.insert('clinics', {
         ownerUserId: patientUserId,
-        name: 'عيادة النور',
+        name: 'مركز النور',
         wilayaId,
         phone: '+213555810004',
         isActive: true,
@@ -770,9 +770,9 @@ describe('patient home booking data', () => {
       .query(api.bookings.getHomeData, {});
 
     expect(result.nextAppointment).toMatchObject({
-      doctorName: 'د. العيادة',
-      doctorSpecialtyNameAr: 'طب القلب',
-      clinicName: 'عيادة النور',
+      doctorName: 'د. المركز',
+      doctorSpecialtyNameAr: 'القلب',
+      clinicName: 'مركز النور',
       appointmentDate: '2026-07-14',
       appointmentTime: '09:30',
     });
@@ -813,7 +813,7 @@ describe('patient home booking data', () => {
       });
       const patientUserId = await ctx.db.insert('users', {
         tokenIdentifier: 'clerk|legacy-patient',
-        fullName: 'مريض العيادة القديمة',
+        fullName: 'عميل المركز القديمة',
         gender: 'female',
         role: 'patient',
         phone: '+213555810202',
@@ -835,7 +835,7 @@ describe('patient home booking data', () => {
       });
       await ctx.db.insert('clinics', {
         doctorId,
-        name: 'عيادة د. عزدين العز',
+        name: 'مركز د. عزدين العز',
         wilayaId,
         phone: '+213555810204',
         isActive: true,
@@ -861,8 +861,8 @@ describe('patient home booking data', () => {
 
     expect(result.nextAppointment).toMatchObject({
       doctorName: 'د. عزدين العز',
-      doctorSpecialtyNameAr: 'طب القلب',
-      clinicName: 'عيادة د. عزدين العز',
+      doctorSpecialtyNameAr: 'القلب',
+      clinicName: 'مركز د. عزدين العز',
       appointmentDate: '2026-07-14',
       appointmentTime: '09:20',
     });
@@ -903,7 +903,7 @@ describe('patient home booking data', () => {
       });
       const patientUserId = await ctx.db.insert('users', {
         tokenIdentifier: 'clerk|solo-patient',
-        fullName: 'مريض منفرد',
+        fullName: 'عميل منفرد',
         gender: 'female',
         role: 'patient',
         phone: '+213555810102',
@@ -944,8 +944,8 @@ describe('patient home booking data', () => {
 
     expect(result.nextAppointment).toMatchObject({
       doctorName: 'د. منفرد',
-      doctorSpecialtyNameAr: 'طب عام',
-      clinicName: 'الطبيب ليس في عيادة',
+      doctorSpecialtyNameAr: 'استشارة عامة',
+      clinicName: 'المختص ليس في مركز',
       appointmentDate: '2026-07-14',
       appointmentTime: '09:30',
     });
@@ -1010,7 +1010,7 @@ describe('clinic-first booking availability', () => {
       });
       const clinicUserId = await ctx.db.insert('users', {
         tokenIdentifier: 'clerk|bookable-clinic',
-        fullName: 'عيادة اليوم',
+        fullName: 'مركز اليوم',
         role: 'clinic',
         phone: '+213555710000',
         phoneNormalized: '+213555710000',
@@ -1019,7 +1019,7 @@ describe('clinic-first booking availability', () => {
       });
       const clinicId = await ctx.db.insert('clinics', {
         ownerUserId: clinicUserId,
-        name: 'عيادة اليوم',
+        name: 'مركز اليوم',
         wilayaId,
         phone: '+213555710000',
         isActive: true,
@@ -1027,7 +1027,7 @@ describe('clinic-first booking availability', () => {
 
       const availableDoctorUserId = await ctx.db.insert('users', {
         tokenIdentifier: 'clerk|bookable-doctor-1',
-        fullName: 'طبيب متاح',
+        fullName: 'مختص متاح',
         gender: 'male',
         role: 'doctor',
         phone: '+213555710001',
@@ -1046,7 +1046,7 @@ describe('clinic-first booking availability', () => {
 
       const onLeaveDoctorUserId = await ctx.db.insert('users', {
         tokenIdentifier: 'clerk|bookable-doctor-2',
-        fullName: 'طبيب في إجازة',
+        fullName: 'مختص في إجازة',
         gender: 'male',
         role: 'doctor',
         phone: '+213555710002',
@@ -1065,7 +1065,7 @@ describe('clinic-first booking availability', () => {
 
       const fullDoctorUserId = await ctx.db.insert('users', {
         tokenIdentifier: 'clerk|bookable-doctor-3',
-        fullName: 'طبيب ممتلئ',
+        fullName: 'مختص ممتلئ',
         gender: 'male',
         role: 'doctor',
         phone: '+213555710003',
@@ -1113,7 +1113,7 @@ describe('clinic-first booking availability', () => {
 
       const patientUserId = await ctx.db.insert('users', {
         tokenIdentifier: 'clerk|bookable-patient',
-        fullName: 'مريض الحجز',
+        fullName: 'عميل الحجز',
         gender: 'female',
         role: 'patient',
         phone: '+213555710004',
@@ -1159,7 +1159,7 @@ describe('clinic-first booking availability', () => {
         clinicId: seeded.clinicId,
         doctorId: seeded.firstDoctorId,
         exceptionDate: '2099-07-06',
-        reason: 'إجازة الطبيب',
+        reason: 'إجازة المختص',
       }),
     );
 
@@ -1186,7 +1186,7 @@ describe('clinic-first booking availability', () => {
       ctx.db.insert('scheduleExceptions', {
         clinicId: seeded.clinicId,
         exceptionDate: '2099-07-13',
-        reason: 'العيادة مغلقة',
+        reason: 'المركز مغلقة',
       }),
     );
 
@@ -1237,7 +1237,7 @@ describe('clinic-first booking availability', () => {
     await t.run(async (ctx) => {
       const patientUserId = await ctx.db.insert('users', {
         tokenIdentifier: 'clerk|booking-clinic-patient',
-        fullName: 'مريض العيادة',
+        fullName: 'عميل المركز',
         gender: 'female',
         role: 'patient',
         phone: '+213555700010',
@@ -1274,7 +1274,7 @@ describe('clinic-first booking availability', () => {
         clinicId: seeded.clinicId,
         doctorId: seeded.firstDoctorId,
         doctorName: 'د. أ',
-        patientName: 'مريض العيادة',
+        patientName: 'عميل المركز',
         appointmentDate: '2099-07-06',
         appointmentTime: '09:00',
       },
@@ -1288,7 +1288,7 @@ describe('clinic-first booking availability', () => {
     await t.run(async (ctx) => {
       const patientUserId = await ctx.db.insert('users', {
         tokenIdentifier: 'clerk|booking-clinic-count-patient',
-        fullName: 'مريض العد',
+        fullName: 'عميل العد',
         gender: 'female',
         role: 'patient',
         phone: '+213555700011',

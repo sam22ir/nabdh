@@ -44,7 +44,7 @@ const STATUS_CONFIG: Record<
   { label: string; color: string; backgroundColor: string }
 > = {
   confirmed: {
-    label: "بانتظار المريض",
+    label: "بانتظار العميل",
     color: theme.colors.status.warning.text,
     backgroundColor: theme.colors.status.warning.background,
   },
@@ -54,7 +54,7 @@ const STATUS_CONFIG: Record<
     backgroundColor: theme.colors.secondary,
   },
   in_room: {
-    label: "داخل عند الطبيب",
+    label: "داخل عند المختص",
     color: "#7C3AED",
     backgroundColor: "#F3E8FF",
   },
@@ -222,7 +222,7 @@ export default function ClinicAppointmentsScreen() {
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content}>
         <DoctorHeader
-          title="مواعيد العيادة"
+          title="مواعيد المركز"
           icon="calendar-outline"
           centerTitle
         />
@@ -242,7 +242,7 @@ export default function ClinicAppointmentsScreen() {
             </Pressable>
           ))}
         </View>
-        <DoctorSection title="اختر الطبيب">
+        <DoctorSection title="اختر المختص">
           {doctorOptions.length > 0 ? (
             <View style={styles.doctorGrid}>
               {doctorOptions.map((doctor) => {
@@ -292,7 +292,7 @@ export default function ClinicAppointmentsScreen() {
             </View>
           ) : (
             <Text style={styles.emptyText}>
-              لا يوجد أطباء لعرض مواعيدهم حالياً.
+              لا يوجد مختصون لعرض مواعيدهم حالياً.
             </Text>
           )}
         </DoctorSection>
@@ -426,7 +426,7 @@ export default function ClinicAppointmentsScreen() {
             <Text style={styles.emptyText}>
               {viewMode === "history"
                 ? "لا توجد مواعيد سابقة في السجل."
-                : "لا توجد مواعيد حالية أو قادمة داخل العيادة."}
+                : "لا توجد مواعيد حالية أو قادمة داخل المركز."}
             </Text>
           )}
           {viewMode === "history" && historyStatus === "CanLoadMore" ? (
@@ -541,7 +541,7 @@ export default function ClinicAppointmentsScreen() {
                       {selectedAppointment.appointmentDuration} دقيقة
                     </Text>
                     <Text style={styles.modalStatSecondary}>
-                      حسب جدول العيادة
+                      حسب جدول المركز
                     </Text>
                   </View>
                 </View>
@@ -551,13 +551,13 @@ export default function ClinicAppointmentsScreen() {
                     <Text style={styles.detailValue}>
                       {selectedAppointment.patientName}
                     </Text>
-                    <Text style={styles.detailLabel}>المريض</Text>
+                    <Text style={styles.detailLabel}>العميل</Text>
                   </View>
                   <View style={styles.detailRow}>
                     <Text style={styles.detailValue}>
                       {selectedAppointment.doctorName}
                     </Text>
-                    <Text style={styles.detailLabel}>الطبيب</Text>
+                    <Text style={styles.detailLabel}>المختص</Text>
                   </View>
                   <View style={styles.detailRow}>
                     <Text style={styles.detailValue}>

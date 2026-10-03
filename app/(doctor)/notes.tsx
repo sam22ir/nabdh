@@ -62,7 +62,7 @@ type PatientGroup = {
 const STATUS_LABELS: Record<AppointmentStatus, string> = {
   confirmed: 'مؤكد',
   present: 'حاضر',
-  in_room: 'داخل العيادة',
+  in_room: 'داخل المركز',
   cancelled: 'ملغى',
   completed: 'مكتمل',
   no_show: 'لم يحضر',
@@ -296,10 +296,10 @@ export default function DoctorNotesScreen() {
               <Pressable
                 style={styles.backButton}
                 onPress={() => setSelectedPatientKey(null)}
-                accessibilityLabel="العودة إلى المرضى"
+                accessibilityLabel="العودة إلى العملاء"
               >
                 <Ionicons name="arrow-forward" size={18} color={theme.colors.primary} />
-                <Text style={styles.backButtonText}>المرضى</Text>
+                <Text style={styles.backButtonText}>العملاء</Text>
               </Pressable>
               <DoctorSection
                 title={selectedPatient.name}
@@ -324,7 +324,7 @@ export default function DoctorNotesScreen() {
                   style={styles.searchInput}
                   value={search}
                   onChangeText={setSearch}
-                  placeholder="ابحث باسم المريض أو رقم الهاتف"
+                  placeholder="ابحث باسم العميل أو رقم الهاتف"
                   placeholderTextColor={theme.colors.textSecondary}
                   textAlign="right"
                 />
@@ -336,8 +336,8 @@ export default function DoctorNotesScreen() {
               </View>
 
               <DoctorSection
-                title="المرضى"
-                subtitle="اختر مريضاً لعرض مواعيده وملاحظات كل زيارة"
+                title="العملاء"
+                subtitle="اختر عميلاً لعرض مواعيده وملاحظات كل زيارة"
               >
                 {status === 'LoadingFirstPage' ? (
                   <View style={styles.loadingState}>
@@ -375,7 +375,7 @@ export default function DoctorNotesScreen() {
                 ) : (
                   <View style={styles.emptyState}>
                     <Ionicons name="people-outline" size={25} color={theme.colors.textMuted} />
-                    <Text style={styles.emptyTitle}>لا يوجد مرضى مطابقون</Text>
+                    <Text style={styles.emptyTitle}>لا يوجد عملاء مطابقون</Text>
                     <Text style={styles.emptyText}>جرّب اسماً أو رقم هاتف مختلفاً.</Text>
                   </View>
                 )}

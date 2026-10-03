@@ -55,7 +55,7 @@ function LoadingScreen() {
   return (
     <View style={styles.centerContainer}>
       <ActivityIndicator size="large" color={theme.colors.primary} />
-      <Text style={styles.loadingText}>جاري تحميل معلومات العيادة...</Text>
+      <Text style={styles.loadingText}>جاري تحميل معلومات المركز...</Text>
     </View>
   );
 }
@@ -100,7 +100,7 @@ function ClinicSummary({ clinic }: { clinic: BookingClinic }) {
         />
       </View>
       <View style={styles.clinicCopy}>
-        <Text style={styles.clinicLabel}>العيادة</Text>
+        <Text style={styles.clinicLabel}>المركز</Text>
         <Text style={styles.clinicName} numberOfLines={1}>
           {clinic.nameAr ?? clinic.name}
         </Text>
@@ -121,7 +121,7 @@ function DoctorChoiceCard({
   selected: boolean;
   onSelect: () => void;
 }) {
-  const doctorName = doctor.fullNameAr ?? doctor.fullName ?? 'طبيب';
+  const doctorName = doctor.fullNameAr ?? doctor.fullName ?? 'مختص';
   const specialtyName =
     doctor.specialty?.nameAr ?? doctor.specialty?.name ?? 'اختصاصي';
 
@@ -135,7 +135,7 @@ function DoctorChoiceCard({
       onPress={onSelect}
       accessibilityRole="radio"
       accessibilityState={{ selected }}
-      accessibilityLabel={`اختيار الطبيب ${doctorName}`}
+      accessibilityLabel={`اختيار المختص ${doctorName}`}
     >
       <AppAvatar name={doctorName} size={44} />
       <View style={styles.doctorCopy}>
@@ -235,7 +235,7 @@ export default function ClinicSelectionScreen() {
   if (!clinicId) {
     return (
       <ErrorScreen
-        message="معرف العيادة غير موجود. يرجى العودة والمحاولة مرة أخرى."
+        message="معرف المركز غير موجود. يرجى العودة والمحاولة مرة أخرى."
         onBack={handleBack}
       />
     );
@@ -246,7 +246,7 @@ export default function ClinicSelectionScreen() {
   if (!bookingContext || !clinic) {
     return (
       <ErrorScreen
-        message="تعذر تحميل معلومات العيادة."
+        message="تعذر تحميل معلومات المركز."
         onBack={handleBack}
       />
     );
@@ -304,7 +304,7 @@ export default function ClinicSelectionScreen() {
           ))}
         </View>
         <View style={styles.stepsLabelRow}>
-          <Text style={[styles.stepLabel, styles.stepLabelActive]}>الطبيب</Text>
+          <Text style={[styles.stepLabel, styles.stepLabelActive]}>المختص</Text>
           <Text style={styles.stepLabel}>الموعد</Text>
           <Text style={styles.stepLabel}>التأكيد</Text>
         </View>
@@ -318,9 +318,9 @@ export default function ClinicSelectionScreen() {
         >
           <ClinicSummary clinic={clinic} />
 
-          <Text style={styles.sectionTitle}>اختيار الطبيب</Text>
+          <Text style={styles.sectionTitle}>اختيار المختص</Text>
           <Text style={styles.sectionHint}>
-            اختر الطبيب داخل العيادة لعرض مواعيده المتاحة.
+            اختر المختص داخل المركز لعرض مواعيده المتاحة.
           </Text>
 
           {doctors.length > 0 ? (
@@ -341,7 +341,7 @@ export default function ClinicSelectionScreen() {
               />
               <Text style={styles.emptyTitle}>لا توجد مواعيد متاحة حالياً</Text>
               <Text style={styles.emptyMessage}>
-                تظهر العيادة للبحث، لكن لا يوجد أطباء متاحون للحجز الآن.
+                يظهر المركز في البحث، لكن لا يوجد مختصون متاحون للحجز الآن.
               </Text>
             </View>
           )}

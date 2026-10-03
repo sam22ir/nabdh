@@ -38,7 +38,7 @@ test('patient can register, filter doctors, favorite, and book an appointment on
 
   const email = `codex-web-booking-${Date.now()}@example.test`;
   const password = 'Password123!';
-  const patientName = 'مريض تجربة كودكس';
+  const patientName = 'عميل تجربة كودكس';
   const nextSunday = nextDateForDay(0);
 
   await page.goto('/');
@@ -48,7 +48,7 @@ test('patient can register, filter doctors, favorite, and book an appointment on
   await expect(page.getByText('شفافية كاملة')).toBeVisible();
   await page.getByRole('button', { name: 'الشريحة التالية' }).click();
   await expect(page.getByText('تذكير بالموعد')).toBeVisible();
-  await page.getByText('أنا مريض', { exact: true }).click();
+  await page.getByText('أنا عميل', { exact: true }).click();
 
   await expect(page.getByText('إنشاء حساب')).toBeVisible();
   await page.getByPlaceholder('الاسم الكامل بالعربية').fill(patientName);
@@ -81,8 +81,8 @@ test('patient can register, filter doctors, favorite, and book an appointment on
   await expect(page.getByRole('button', { name: 'إزالة من المفضلة' })).toBeVisible();
   await page.getByRole('button', { name: 'احجز موعداً' }).click();
 
-  await expect(page.getByText('اختر العيادة')).toBeVisible();
-  await page.getByRole('radio', { name: 'اختيار عيادة Cabinet Cardio Didouche' }).click();
+  await expect(page.getByText('اختر المركز')).toBeVisible();
+  await page.getByRole('radio', { name: 'اختيار مركز Cabinet Cardio Didouche' }).click();
   await page.getByRole('button', { name: 'التالي' }).click();
 
   await expect(page.getByText('اختر التاريخ')).toBeVisible();
@@ -99,7 +99,7 @@ test('patient can register, filter doctors, favorite, and book an appointment on
   await availableTime.click();
   await page.getByRole('button', { name: 'التالي' }).click();
 
-  await expect(page.getByText('من سيزور الطبيب؟')).toBeVisible();
+  await expect(page.getByText('من سيزور المختص؟')).toBeVisible();
   await expect(page.getByRole('radio', { name: 'نفسي' })).toBeVisible();
   await page.getByRole('button', { name: 'التالي' }).click();
 

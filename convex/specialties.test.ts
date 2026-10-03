@@ -8,6 +8,6 @@ describe('specialties.list', () => {
         nameAr: 'طب القلب',
         nameFr: 'Cardiologie',
       }),
-    ).toBe('طب القلب');
+    ).toBe('القلب');
   });
 });

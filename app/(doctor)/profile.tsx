@@ -573,7 +573,7 @@ export default function DoctorProfileScreen() {
         showToast();
       } catch (error) {
         setCompleteDoctorProfileError(
-          getArabicErrorMessage(error, 'تعذر إكمال ملف الطبيب'),
+          getArabicErrorMessage(error, 'تعذر إكمال ملف المختص'),
         );
       }
     },
@@ -609,7 +609,7 @@ export default function DoctorProfileScreen() {
             size={48}
             color={theme.colors.danger}
           />
-          <Text style={styles.loadingText}>تعذر تحميل ملف الطبيب</Text>
+          <Text style={styles.loadingText}>تعذر تحميل ملف المختص</Text>
         </View>
       </SafeAreaView>
     );
@@ -629,19 +629,19 @@ export default function DoctorProfileScreen() {
           >
             <View style={styles.missingProfileIcon}>
               <Ionicons
-                name="medkit-outline"
+                name="briefcase-outline"
                 size={32}
                 color={theme.colors.primary}
               />
             </View>
             <DoctorHeader
-              title="أكمل ملف الطبيب"
-              subtitle="نحتاج التخصص قبل فتح إعدادات العيادات والمواعيد."
-              icon="medkit-outline"
+              title="أكمل ملف المختص"
+              subtitle="نحتاج التخصص قبل فتح إعدادات المراكز والمواعيد."
+              icon="briefcase-outline"
               style={styles.missingDoctorHeader}
             />
             <Text style={styles.missingProfileText}>
-              نحتاج التخصص قبل فتح إعدادات العيادات والمواعيد.
+              نحتاج التخصص قبل فتح إعدادات المراكز والمواعيد.
             </Text>
 
             {completeDoctorProfileError ? (
@@ -702,7 +702,7 @@ export default function DoctorProfileScreen() {
               onPress={handleCompleteSubmit(onCompleteDoctorProfile)}
               disabled={isCompletingDoctorProfile}
               accessibilityRole="button"
-              accessibilityLabel="إكمال ملف الطبيب"
+              accessibilityLabel="إكمال ملف المختص"
             >
               <Ionicons
                 name={
@@ -874,7 +874,7 @@ export default function DoctorProfileScreen() {
                   inputRef={ref}
                   onLayout={registerProfileFieldLayout('bioAr')}
                   error={errors.bioAr?.message}
-                  placeholder="مثال: طبيب مختص بخبرة في المتابعة اليومية"
+                  placeholder="مثال: مختص مختص بخبرة في المتابعة اليومية"
                 />
               )}
             />

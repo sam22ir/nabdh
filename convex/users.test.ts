@@ -52,7 +52,7 @@ describe('users.registerAccount', () => {
       .withIdentity(identity('clerk|patient-1'))
       .mutation(api.users.registerAccount, {
         role: 'patient',
-        fullName: 'مريض جديد',
+        fullName: 'عميل جديد',
         gender: 'male',
         phone: '05 55 12 34 56',
         email: '',
@@ -63,7 +63,7 @@ describe('users.registerAccount', () => {
       .query(api.users.me, {});
 
     expect(me).toMatchObject({
-      fullName: 'مريض جديد',
+      fullName: 'عميل جديد',
       role: 'patient',
       phone: '05 55 12 34 56',
       phoneNormalized: '+213555123456',
@@ -83,7 +83,7 @@ describe('users.registerAccount', () => {
       .withIdentity(identity('clerk|patient-custom-key'))
       .mutation(api.users.registerAccount, {
         role: 'patient',
-        fullName: 'مريض جديد',
+        fullName: 'عميل جديد',
         gender: 'male',
         phone: '05 55 12 34 56',
         phoneLoginKey: 'dz213555123456x999',
@@ -114,7 +114,7 @@ describe('users.registerAccount', () => {
       .withIdentity(identity('clerk|doctor-1'))
       .mutation(api.users.registerAccount, {
         role: 'doctor',
-        fullName: 'طبيب جديد',
+        fullName: 'مختص جديد',
         gender: 'female',
         phone: '+213666123456',
         email: ' DOCTOR@Example.TEST ',
@@ -127,7 +127,7 @@ describe('users.registerAccount', () => {
       .query(api.users.me, {});
 
     expect(me).toMatchObject({
-      fullName: 'طبيب جديد',
+      fullName: 'مختص جديد',
       role: 'doctor',
       email: 'DOCTOR@Example.TEST',
       emailNormalized: 'doctor@example.test',
@@ -155,8 +155,8 @@ describe('users.registerAccount', () => {
       .withIdentity(identity('clerk|clinic-1'))
       .mutation(api.users.registerAccount, {
         role: 'clinic',
-        clinicName: 'عيادة الشفاء',
-        fullName: 'عيادة الشفاء',
+        clinicName: 'مركز الشفاء',
+        fullName: 'مركز الشفاء',
         phone: '05 55 88 99 00',
         email: ' CLINIC@example.TEST ',
         wilayaId,
@@ -167,7 +167,7 @@ describe('users.registerAccount', () => {
       .query(api.users.me, {});
 
     expect(me).toMatchObject({
-      fullName: 'عيادة الشفاء',
+      fullName: 'مركز الشفاء',
       role: 'clinic',
       phone: '05 55 88 99 00',
       phoneNormalized: '+213555889900',
@@ -176,7 +176,7 @@ describe('users.registerAccount', () => {
       emailNormalized: 'clinic@example.test',
       isActive: true,
       profile: {
-        name: 'عيادة الشفاء',
+        name: 'مركز الشفاء',
         phone: '05 55 88 99 00',
         wilayaId,
         isActive: true,
@@ -200,7 +200,7 @@ describe('users.registerAccount', () => {
     await t.run((ctx) =>
       ctx.db.insert('users', {
         tokenIdentifier: 'clerk|doctor-complete-blank-order',
-        fullName: 'طبيب إكمال الملف',
+        fullName: 'مختص إكمال الملف',
         gender: 'male',
         role: 'doctor',
         phone: '+213555777888',
@@ -238,7 +238,7 @@ describe('users.registerAccount', () => {
       .withIdentity(identity('clerk|patient-2'))
       .mutation(api.users.registerAccount, {
         role: 'patient',
-        fullName: 'مريض',
+        fullName: 'عميل',
         gender: 'male',
         phone: '0555123456',
         email: '',
@@ -249,7 +249,7 @@ describe('users.registerAccount', () => {
         api.users.registerAccount,
         {
           role: 'doctor',
-          fullName: 'طبيب',
+          fullName: 'مختص',
           gender: 'male',
           phone: '+213555123456',
           email: '',
@@ -267,7 +267,7 @@ describe('users.registerAccount', () => {
       .withIdentity(identity('clerk|patient-3'))
       .mutation(api.users.registerAccount, {
         role: 'patient',
-        fullName: 'مريض',
+        fullName: 'عميل',
         gender: 'male',
         phone: '0555123456',
         email: 'same@example.test',
@@ -278,7 +278,7 @@ describe('users.registerAccount', () => {
         api.users.registerAccount,
         {
           role: 'doctor',
-          fullName: 'طبيب',
+          fullName: 'مختص',
           gender: 'male',
           phone: '0666123456',
           email: ' SAME@example.test ',
@@ -296,7 +296,7 @@ describe('users.getLoginResolution', () => {
       .withIdentity(identity('clerk|patient-login'))
       .mutation(api.users.registerAccount, {
         role: 'patient',
-        fullName: 'مريض',
+        fullName: 'عميل',
         gender: 'male',
         phone: '05 55 12 34 56',
         email: '',
@@ -324,7 +324,7 @@ describe('users.getLoginResolution', () => {
       .withIdentity(identity('clerk|clinic-login'))
       .mutation(api.users.registerAccount, {
         role: 'clinic',
-        clinicName: 'عيادة الدخول',
+        clinicName: 'مركز الدخول',
         phone: '05 55 12 34 57',
         email: '',
         wilayaId,
@@ -346,7 +346,7 @@ describe('users.getLoginResolution', () => {
       .withIdentity(identity('clerk|patient-wrong-role'))
       .mutation(api.users.registerAccount, {
         role: 'patient',
-        fullName: 'مريض',
+        fullName: 'عميل',
         gender: 'male',
         phone: '0555123456',
         email: '',
@@ -368,7 +368,7 @@ describe('users.getLoginResolution', () => {
       .withIdentity(identity('clerk|patient-phone-mismatch'))
       .mutation(api.users.registerAccount, {
         role: 'patient',
-        fullName: 'مريض',
+        fullName: 'عميل',
         gender: 'male',
         phone: '05 55 12 34 56',
         email: '',
@@ -393,7 +393,7 @@ describe('users.deleteMyDoctorAccount', () => {
     const seeded = await t.run(async (ctx) => {
       const doctorUserId = await ctx.db.insert('users', {
         tokenIdentifier: 'clerk|doctor-delete',
-        fullName: 'طبيب الحذف',
+        fullName: 'مختص الحذف',
         gender: 'male',
         role: 'doctor',
         phone: '+213555777111',
@@ -415,7 +415,7 @@ describe('users.deleteMyDoctorAccount', () => {
       });
       const patientUserId = await ctx.db.insert('users', {
         tokenIdentifier: 'clerk|patient-delete',
-        fullName: 'مريض الحذف',
+        fullName: 'عميل الحذف',
         gender: 'female',
         role: 'patient',
         phone: '+213555777222',
@@ -434,7 +434,7 @@ describe('users.deleteMyDoctorAccount', () => {
       });
       const clinicId = await ctx.db.insert('clinics', {
         doctorId,
-        name: 'عيادة الحذف',
+        name: 'مركز الحذف',
         wilayaId,
         address: 'عنوان',
         phone: '+213555777111',
@@ -571,7 +571,7 @@ describe('users.deleteMyDoctorAccount', () => {
     expect(result.booking).toMatchObject({
       status: 'cancelled',
       cancelledBy: 'system',
-      cancellationReason: 'تم حذف حساب الطبيب',
+      cancellationReason: 'تم حذف حساب المختص',
     });
   });
 });
@@ -591,7 +591,7 @@ describe('users.deleteMyClinicAccount', () => {
       });
       const clinicUserId = await ctx.db.insert('users', {
         tokenIdentifier: 'clerk|clinic-delete',
-        fullName: 'عيادة للحذف',
+        fullName: 'مركز للحذف',
         role: 'clinic',
         phone: '+213555991100',
         phoneNormalized: '+213555991100',
@@ -600,7 +600,7 @@ describe('users.deleteMyClinicAccount', () => {
       });
       const doctorUserId = await ctx.db.insert('users', {
         tokenIdentifier: 'clerk|clinic-delete-doctor',
-        fullName: 'طبيب العيادة',
+        fullName: 'مختص المركز',
         gender: 'male',
         role: 'doctor',
         phone: '+213555991101',
@@ -618,14 +618,14 @@ describe('users.deleteMyClinicAccount', () => {
       });
       const clinicId = await ctx.db.insert('clinics', {
         ownerUserId: clinicUserId,
-        name: 'عيادة للحذف',
+        name: 'مركز للحذف',
         wilayaId,
         phone: '+213555991100',
         isActive: true,
       });
       const patientUserId = await ctx.db.insert('users', {
         tokenIdentifier: 'clerk|clinic-delete-patient',
-        fullName: 'مريض العيادة',
+        fullName: 'عميل المركز',
         gender: 'female',
         role: 'patient',
         phone: '+213555991102',
@@ -757,7 +757,7 @@ describe('users.deleteMyClinicAccount', () => {
     expect(result.booking).toMatchObject({
       status: 'cancelled',
       cancelledBy: 'system',
-      cancellationReason: 'تم حذف حساب العيادة',
+      cancellationReason: 'تم حذف حساب المركز',
     });
   });
 });
@@ -777,7 +777,7 @@ describe('users.deleteMyPatientAccount', () => {
       });
       const doctorUserId = await ctx.db.insert('users', {
         tokenIdentifier: 'clerk|patient-delete-doctor',
-        fullName: 'طبيب المريض',
+        fullName: 'مختص العميل',
         gender: 'male',
         role: 'doctor',
         phone: '+213555992100',
@@ -795,14 +795,14 @@ describe('users.deleteMyPatientAccount', () => {
       });
       const clinicId = await ctx.db.insert('clinics', {
         doctorId,
-        name: 'عيادة الطبيب',
+        name: 'مركز المختص',
         wilayaId,
         phone: '+213555992100',
         isActive: true,
       });
       const patientUserId = await ctx.db.insert('users', {
         tokenIdentifier: 'clerk|patient-delete',
-        fullName: 'مريض للحذف',
+        fullName: 'عميل للحذف',
         gender: 'female',
         role: 'patient',
         phone: '+213555992101',
@@ -922,7 +922,7 @@ describe('users.updateMyClinicProfile', () => {
       });
       const clinicUserId = await ctx.db.insert('users', {
         tokenIdentifier: 'clerk|clinic-update',
-        fullName: 'عيادة البداية',
+        fullName: 'مركز البداية',
         role: 'clinic',
         phone: '+213555880000',
         phoneNormalized: '+213555880000',
@@ -933,7 +933,7 @@ describe('users.updateMyClinicProfile', () => {
       });
       const clinicId = await ctx.db.insert('clinics', {
         ownerUserId: clinicUserId,
-        name: 'عيادة البداية',
+        name: 'مركز البداية',
         wilayaId: initialWilayaId,
         address: 'العنوان القديم',
         mapUrl: 'https://maps.app.goo.gl/start',
@@ -950,7 +950,7 @@ describe('users.updateMyClinicProfile', () => {
       t.withIdentity(identity('clerk|clinic-update')).mutation(
         api.users.updateMyClinicProfile,
         {
-          clinicName: 'عيادة الشفاء',
+          clinicName: 'مركز الشفاء',
           phone: '0555881111',
           email: 'updated@example.test',
           wilayaId: seeded.nextWilayaId,
@@ -965,14 +965,14 @@ describe('users.updateMyClinicProfile', () => {
       clinic: await ctx.db.get(seeded.clinicId),
     }));
 
-    expect(result.user?.fullName).toBe('عيادة الشفاء');
+    expect(result.user?.fullName).toBe('مركز الشفاء');
     expect(result.user?.phone).toBe('0555881111');
     expect(result.user?.phoneNormalized).toBe('+213555881111');
     expect(result.user?.phoneLoginKey).toBe('dz213555881111');
     expect(result.user?.email).toBe('updated@example.test');
     expect(result.user?.emailNormalized).toBe('updated@example.test');
 
-    expect(result.clinic?.name).toBe('عيادة الشفاء');
+    expect(result.clinic?.name).toBe('مركز الشفاء');
     expect(result.clinic?.phone).toBe('0555881111');
     expect(result.clinic?.email).toBe('updated@example.test');
     expect(result.clinic?.emailNormalized).toBe('updated@example.test');
@@ -991,7 +991,7 @@ describe('users.updateMyClinicProfile', () => {
       });
       const clinicUserId = await ctx.db.insert('users', {
         tokenIdentifier: 'clerk|clinic-update-blank',
-        fullName: 'عيادة الفراغ',
+        fullName: 'مركز الفراغ',
         role: 'clinic',
         phone: '+213555880001',
         phoneNormalized: '+213555880001',
@@ -1002,7 +1002,7 @@ describe('users.updateMyClinicProfile', () => {
       });
       const clinicId = await ctx.db.insert('clinics', {
         ownerUserId: clinicUserId,
-        name: 'عيادة الفراغ',
+        name: 'مركز الفراغ',
         wilayaId,
         address: 'عنوان سابق',
         mapUrl: 'https://maps.app.goo.gl/blank',
@@ -1019,7 +1019,7 @@ describe('users.updateMyClinicProfile', () => {
       t.withIdentity(identity('clerk|clinic-update-blank')).mutation(
         api.users.updateMyClinicProfile,
         {
-          clinicName: 'عيادة الفراغ',
+          clinicName: 'مركز الفراغ',
           phone: '0555880001',
           email: '',
           wilayaId: seeded.wilayaId,

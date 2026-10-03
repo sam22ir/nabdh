@@ -12,8 +12,8 @@ describe("patient screens use backend data", () => {
     expect(source).toContain("searchMode");
     expect(source).toContain("api.doctors.listPublic");
     expect(source).toContain("api.clinics.listPublic");
-    expect(source).toContain("الأطباء");
-    expect(source).toContain("العيادات");
+    expect(source).toContain("المختصين");
+    expect(source).toContain("المراكز");
     expect(source).toContain("acceptedClinicId");
     expect(source).toContain("isBookable");
   });
@@ -35,7 +35,7 @@ describe("patient screens use backend data", () => {
     expect(clinicSource).toContain("api.clinics.getBookingContext");
     expect(clinicSource).toContain("clinicId");
     expect(clinicSource).toContain("doctorId");
-    expect(clinicSource).toContain("اختيار الطبيب");
+    expect(clinicSource).toContain("اختيار المختص");
     expect(dateTimeSource).toContain("doctorId: doctorId as Id<'doctors'>");
     expect(dateTimeSource).toContain("api.bookings.getAvailableSlots");
     expect(doctorProfileSource).toContain("acceptedClinicId");
@@ -222,7 +222,7 @@ describe("patient screens use backend data", () => {
     expect(typesSource).toContain("doctorNote: string | null");
     expect(appointmentsSource).toContain("doctorNote: item.doctorNote ?? null");
     expect(appointmentsSource).toContain("doctorNote: item.doctorNote");
-    expect(appointmentCardSource).toContain('label="ملاحظة الطبيب"');
+    expect(appointmentCardSource).toContain('label="ملاحظة المختص"');
     expect(appointmentCardSource).toContain("value={appointment.doctorNote}");
   });
 
@@ -260,7 +260,7 @@ describe("patient screens use backend data", () => {
     expect(source).toContain("item.cancellationReason?.trim()");
     expect(source).toContain("لم يتم تسجيل سبب الإلغاء");
     expect(source).toContain("سبب الإلغاء: ${cancellationReason}");
-    expect(source).toContain("item.clinicName ?? item.clinic?.name ?? 'العيادة غير محددة'");
+    expect(source).toContain("item.clinicName ?? item.clinic?.name ?? 'المركز غير محدد'");
     expect(source).not.toContain("item.cancelReason");
   });
 
@@ -310,7 +310,7 @@ describe("patient screens use backend data", () => {
     expect(source).toContain("setFamilyModalVisible(true)");
     expect(source).toContain("setLogoutModalVisible(true)");
     expect(source).toContain("api.locations.listCommunesByWilaya");
-    expect(source).toContain("أكمل ملفك الطبي");
+    expect(source).toContain("أكمل ملفك الشخصي");
     expect(source).not.toContain("currentWilayaName");
     expect(source).toContain('value={profileEmail}');
     expect(source).toContain('email: email || undefined');
@@ -369,7 +369,7 @@ describe("patient screens use backend data", () => {
 
     expect(source).toContain("styles.searchHeader");
     expect(source).toContain("DoctorHeader");
-    expect(source).toContain("ابحث عن طبيب");
+    expect(source).toContain("ابحث عن مختص");
     expect(source).toContain("styles.searchControls");
     expect(source).toContain("styles.searchGreetingTitle");
     expect(source).toContain("style={styles.searchHeroHeader}");
@@ -521,7 +521,7 @@ describe("patient screens use backend data", () => {
 
     expect(source).toContain("Linking.openURL");
     expect(source).toContain("getClinicMapUrl");
-    expect(source).toContain("اذهب إلى العيادة");
+    expect(source).toContain("اذهب إلى المركز");
     expect(source).toContain("clinic.mapUrl");
   });
 
@@ -543,7 +543,7 @@ describe("patient screens use backend data", () => {
 
     expect(source).toContain("api.users.me");
     expect(source).toContain("!me?.profile");
-    expect(source).toContain("أكمل ملفك الطبي");
+    expect(source).toContain("أكمل ملفك الشخصي");
     expect(source).toContain("getArabicErrorMessage");
     expect(source).not.toContain("Patient profile not found");
   });
@@ -624,7 +624,7 @@ describe("patient screens use backend data", () => {
     );
 
     expect(source).toContain("me.profile");
-    expect(source).toContain("أكمل ملفك الطبي");
+    expect(source).toContain("أكمل ملفك الشخصي");
     expect(source).toContain("getArabicErrorMessage");
     expect(source).not.toContain("Patient profile not found");
   });

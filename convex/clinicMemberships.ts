@@ -195,8 +195,8 @@ export const requestToJoinClinic = mutation({
         ctx,
         clinic.ownerUserId,
         'doctor_join_request',
-        'طلب انضمام طبيب',
-        'يوجد طلب جديد من طبيب للانضمام إلى العيادة.',
+        'طلب انضمام مختص',
+        'يوجد طلب جديد من مختص للانضمام إلى المركز.',
         { membershipId, clinicId: args.clinicId, doctorId: doctor._id },
       );
     }
@@ -234,8 +234,8 @@ export const inviteDoctor = mutation({
       ctx,
       doctorUser.user._id,
       'clinic_invite',
-      'دعوة للانضمام إلى عيادة',
-      `${clinic.name} أرسلت لك دعوة للانضمام إلى العيادة.`,
+      'دعوة للانضمام إلى مركز',
+      `${clinic.name} أرسلت لك دعوة للانضمام إلى المركز.`,
       { membershipId, clinicId: clinic._id, doctorId: args.doctorId },
     );
 
@@ -286,7 +286,7 @@ export const accept = mutation({
         doctorUser.user._id,
         'clinic_membership_accepted',
         'تم قبول طلب الانضمام',
-        `${clinic?.name ?? 'العيادة'} قبلت طلب الانضمام.`,
+        `${clinic?.name ?? 'المركز'} قبلت طلب الانضمام.`,
         { membershipId: args.membershipId },
       );
     } else if (membership.requestedBy === 'clinic' && clinic?.ownerUserId) {
@@ -295,7 +295,7 @@ export const accept = mutation({
         clinic.ownerUserId,
         'clinic_membership_accepted',
         'تم قبول الدعوة',
-        `${doctorUser?.user.fullName ?? 'الطبيب'} قبل دعوة العيادة.`,
+        `${doctorUser?.user.fullName ?? 'المختص'} قبل دعوة المركز.`,
         { membershipId: args.membershipId },
       );
     }
@@ -372,7 +372,7 @@ export const leaveClinic = mutation({
     const membership = await getAcceptedMembershipForDoctor(ctx, doctor._id);
     if (!membership) throw new ConvexError('Accepted clinic not found');
 
-    const reason = args.reason?.trim() || 'غادر الطبيب العيادة';
+    const reason = args.reason?.trim() || 'غادر المختص المركز';
     await ctx.db.patch(membership._id, {
       status: 'ended',
       endedAt: Date.now(),
@@ -396,7 +396,7 @@ export const removeDoctor = mutation({
     const membership = await getAcceptedMembershipBetween(ctx, clinic._id, args.doctorId);
     if (!membership) throw new ConvexError('Accepted doctor not found');
 
-    const reason = args.reason?.trim() || 'تم إنهاء عضوية الطبيب في العيادة';
+    const reason = args.reason?.trim() || 'تم إنهاء عضوية المختص في المركز';
     await ctx.db.patch(membership._id, {
       status: 'ended',
       endedAt: Date.now(),

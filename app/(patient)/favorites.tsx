@@ -2,7 +2,7 @@
 // =============================================================================
 // Favorites Screen
 // Lists the patient's favorited doctors with the ability to unfavorite,
-// and an empty state with a "تصفح الأطباء" CTA when no favorites exist.
+// and an empty state with a "تصفح المختصين" CTA when no favorites exist.
 // =============================================================================
 
 import React, { useCallback, useMemo, useState } from 'react';
@@ -331,7 +331,7 @@ export default function FavoritesScreen() {
                 />
                 <Text style={styles.noResultsTitle}>لا توجد نتائج</Text>
                 <Text style={styles.noResultsMessage}>
-                  جرّب البحث باسم الطبيب أو تخصصه، أو غيّر التصفية
+                  جرّب البحث باسم المختص أو تخصصه، أو غيّر التصفية
                 </Text>
               </View>
             }
@@ -341,10 +341,10 @@ export default function FavoritesScreen() {
         <View style={styles.emptyWrapper}>
           <EmptyState
             icon="heart-outline"
-            title="لم تقم بإضافة أطباء للمفضلة بعد"
-            subtitle="ابحث عن الأطباء وأضفهم إلى مفضلتك للوصول السريع"
+            title="لم تقم بإضافة مختصين للمفضلة بعد"
+            subtitle="ابحث عن المختصين وأضفهم إلى مفضلتك للوصول السريع"
             action={{
-              label: 'تصفح الأطباء',
+              label: 'تصفح المختصين',
               onPress: handleBrowseDoctors,
             }}
           />

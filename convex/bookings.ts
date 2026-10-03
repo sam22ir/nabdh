@@ -4,6 +4,7 @@ import { internal } from './_generated/api';
 import type { Doc, Id } from './_generated/dataModel';
 import { internalMutation, mutation, query } from './_generated/server';
 import { getAuthedUser } from './lib/auth';
+import { neutralSpecialtyName } from './lib/specialties';
 
 type DoctorBookingFilters = {
   query?: string;
@@ -474,14 +475,14 @@ async function bookingDetails(ctx: any, booking: any) {
   }
 
   if (!clinicName) {
-    clinicName = 'الطبيب ليس في عيادة';
+    clinicName = 'المختص ليس في مركز';
   }
 
   return {
     ...booking,
     doctor,
     doctorName: doctorUser?.fullName ?? '',
-    doctorSpecialtyNameAr: specialty?.name ?? '',
+    doctorSpecialtyNameAr: specialty ? neutralSpecialtyName(specialty.name) : '',
     patientName: patientUser?.fullName ?? '',
     patientPhone: patientUser?.phone,
     clinicName,
@@ -503,8 +504,8 @@ async function createDoctorNotificationFromBooking(
   const patient = await ctx.db.get(booking.patientId);
   const patientUser = patient ? await ctx.db.get(patient.userId) : null;
   const clinic = await ctx.db.get(booking.clinicId);
-  const patientName = patientUser?.fullName ?? 'مريض';
-  const clinicName = clinic?.name ?? 'العيادة';
+  const patientName = patientUser?.fullName ?? 'عميل';
+  const clinicName = clinic?.name ?? 'المركز';
 
   const title = type === 'new_booking' ? 'حجز جديد' : 'إلغاء موعد';
   const body =
@@ -541,7 +542,7 @@ async function createPatientNoShowNotification(ctx: any, bookingId: Id<'bookings
     userId: patientUser._id,
     type: 'booking_no_show',
     title: 'تم اعتبار الموعد غياباً',
-    body: `تم تسجيل موعدك مع ${doctorUser?.fullName ?? 'الطبيب'} في ${clinic?.name ?? 'العيادة'} كغياب. يمكنك الحجز لاحقاً أو اختيار طبيب أو عيادة أخرى.`,
+    body: `تم تسجيل موعدك مع ${doctorUser?.fullName ?? 'المختص'} في ${clinic?.name ?? 'المركز'} كغياب. يمكنك الحجز لاحقاً أو اختيار مختص أو مركز آخر.`,
     data: {
       bookingId: booking._id,
       clinicId: booking.clinicId,

@@ -160,7 +160,7 @@ export default function ClinicAccountSettingsScreen() {
                 <View style={styles.deleteTitleBlock}>
                   <Text style={styles.deleteTitle}>حذف الحساب</Text>
                   <Text style={styles.deleteDescription}>
-                    سيؤدي هذا الإجراء إلى حذف العيادة وإلغاء المواعيد القادمة وحذف الحساب نهائياً.
+                    سيؤدي هذا الإجراء إلى حذف المركز وإلغاء المواعيد القادمة وحذف الحساب نهائياً.
                   </Text>
                 </View>
               </View>
@@ -187,7 +187,7 @@ export default function ClinicAccountSettingsScreen() {
 
             <View style={styles.modalBody}>
               <Text style={styles.modalText}>
-                سيؤدي حذف الحساب إلى إزالة بيانات العيادة النشطة، وإلغاء المواعيد
+                سيؤدي حذف الحساب إلى إزالة بيانات المركز النشطة، وإلغاء المواعيد
                 القادمة، ثم حذف حساب تسجيل الدخول نهائياً.
               </Text>
               <View style={styles.confirmationBlock}>

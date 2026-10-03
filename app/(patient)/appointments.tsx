@@ -133,7 +133,7 @@ const TABS: TabConfig[] = [
 
 const CANCEL_REASONS: { key: string; label: string }[] = [
   { key: 'change_plans', label: 'تغيير في الخطط' },
-  { key: 'found_other_doctor', label: 'وجدت طبيباً آخر' },
+  { key: 'found_other_doctor', label: 'وجدت مختصاً آخر' },
   { key: 'transport_issue', label: 'مشكلة في المواصلات' },
   { key: 'other', label: 'سبب آخر' },
 ];
@@ -145,7 +145,7 @@ const EMPTY_MESSAGES: Record<
   upcoming: {
     icon: 'calendar-outline',
     title: 'لا يوجد مواعيد قادمة',
-    subtitle: 'احجز موعداً جديداً مع أحد الأطباء',
+    subtitle: 'احجز موعداً جديداً مع أحد المختصين',
   },
   past: {
     icon: 'document-text-outline',
@@ -278,7 +278,7 @@ function toEnrichedAppointment(item: ConvexBookingEntry): EnrichedAppointment {
     createdAt: new Date(item._creationTime).toISOString(),
     doctorName: item.doctorName,
     specialty: item.doctorSpecialtyNameAr,
-    clinicName: item.clinicName ?? item.clinic?.name ?? 'العيادة غير محددة',
+    clinicName: item.clinicName ?? item.clinic?.name ?? 'المركز غير محدد',
     clinicMapUrl: getAppointmentClinicMapUrl(item),
   };
 }
@@ -457,7 +457,7 @@ function ReviewModal({
     >
       <View style={styles.modalOverlay}>
         <View style={styles.modalContainer}>
-          <Text style={styles.modalTitle}>قيم الطبيب</Text>
+          <Text style={styles.modalTitle}>قيم المختص</Text>
           <Text style={styles.modalAppointmentName}>{appointmentName}</Text>
 
           <View style={styles.ratingPicker}>
@@ -489,7 +489,7 @@ function ReviewModal({
 
           <TextInput
             style={styles.reviewInput}
-            placeholder="اكتب ملاحظتك للطبيب..."
+            placeholder="اكتب ملاحظتك للمختص..."
             placeholderTextColor={theme.colors.textSecondary}
             value={comment}
             onChangeText={setComment}
@@ -638,13 +638,13 @@ export default function AppointmentsScreen() {
   const handleCardPress = useCallback(
     (item: EnrichedAppointment) => {
       const dateStr = formatDateShort(item.appointmentDate);
-      const title = `د. ${item.doctorName}`;
+      const title = `${item.doctorName}`;
       const appointmentSummary = `${dateStr} - ${item.appointmentTime}\n${item.clinicName}`;
 
       if (item.status === 'confirmed' || item.status === 'present' || item.status === 'in_room') {
         Alert.alert(title, appointmentSummary, [
           {
-            text: 'عرض صفحة الطبيب',
+            text: 'عرض صفحة المختص',
             onPress: () => {
               router.push(
                 `/(patient)/doctor/${encodeURIComponent(item.doctorId)}` as any,
@@ -955,7 +955,7 @@ export default function AppointmentsScreen() {
       <CancelModal
         visible={cancelTarget !== null}
         appointmentName={
-          cancelTarget ? `د. ${cancelTarget.doctorName}` : ''
+          cancelTarget ? `${cancelTarget.doctorName}` : ''
         }
         loading={isCancelling}
         onClose={() => setCancelTarget(null)}
@@ -965,7 +965,7 @@ export default function AppointmentsScreen() {
       <ReviewModal
         visible={reviewTarget !== null}
         appointmentName={
-          reviewTarget ? `د. ${reviewTarget.doctorName}` : ''
+          reviewTarget ? `${reviewTarget.doctorName}` : ''
         }
         loading={isReviewSubmitting}
         onClose={() => setReviewTarget(null)}

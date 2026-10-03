@@ -29,7 +29,7 @@ describe('auth form validation', () => {
   test('doctor registration requires specialty', () => {
     expect(
       validateDoctorRegistration({
-        fullName: 'طبيب',
+        fullName: 'مختص',
         gender: 'male',
         specialtyId: null,
         wilayaId: null,
@@ -67,7 +67,7 @@ describe('auth form validation', () => {
 
     expect(
       validateClinicRegistration({
-        clinicName: 'عيادة',
+        clinicName: 'مركز',
         phone: '0555123456',
         email: '',
         wilayaId: 'wilaya-id',
@@ -84,7 +84,7 @@ describe('auth form validation', () => {
   test('registration rejects weak passwords before Clerk submit', () => {
     expect(
       validatePatientRegistration({
-        fullName: 'مريض',
+        fullName: 'عميل',
         gender: 'male',
         phone: '0555123456',
         email: '',

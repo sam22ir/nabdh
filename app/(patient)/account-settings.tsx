@@ -152,7 +152,7 @@ export default function PatientAccountSettingsScreen() {
                 <View style={styles.deleteTitleBlock}>
                   <Text style={styles.deleteTitle}>حذف الحساب</Text>
                   <Text style={styles.deleteDescription}>
-                    سيؤدي هذا الإجراء إلى حذف حساب المريض وبياناته المرتبطة نهائياً.
+                    سيؤدي هذا الإجراء إلى حذف حساب العميل وبياناته المرتبطة نهائياً.
                   </Text>
                 </View>
               </View>
@@ -173,7 +173,7 @@ export default function PatientAccountSettingsScreen() {
             </View>
             <View style={styles.modalBody}>
               <Text style={styles.modalText}>
-                سيؤدي حذف الحساب إلى إزالة بيانات المريض والمواعيد والمفضلة ثم حذف حساب تسجيل الدخول نهائياً.
+                سيؤدي حذف الحساب إلى إزالة بيانات العميل والمواعيد والمفضلة ثم حذف حساب تسجيل الدخول نهائياً.
               </Text>
               <View style={styles.confirmationBlock}>
                 <Text style={styles.confirmationLabel}>رقم الهاتف المسجل</Text>

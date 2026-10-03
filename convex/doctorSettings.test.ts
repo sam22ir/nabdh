@@ -15,7 +15,7 @@ async function seedDoctorUser(t: ReturnType<typeof convexTest>) {
   return await t.run(async (ctx) => {
     return await ctx.db.insert('users', {
       tokenIdentifier: 'clerk|doctor-settings',
-      fullName: 'طبيب الإشعارات',
+      fullName: 'مختص الإشعارات',
       gender: 'male',
       role: 'doctor',
       phone: '+213555333333',

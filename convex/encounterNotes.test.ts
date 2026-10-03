@@ -15,7 +15,7 @@ async function seedEncounter(t: ReturnType<typeof convexTest>) {
     const specialtyId = await ctx.db.insert('specialties', { name: 'طب عام', icon: 'medical' });
     const wilayaId = await ctx.db.insert('wilayas', { id: 16, name: 'الجزائر' });
     const clinicUserId = await ctx.db.insert('users', {
-      tokenIdentifier: 'clerk|notes-clinic', fullName: 'عيادة النبض', role: 'clinic',
+      tokenIdentifier: 'clerk|notes-clinic', fullName: 'مركز النبض', role: 'clinic',
       phone: '+213555810000', phoneNormalized: '+213555810000',
       phoneLoginKey: 'dz213555810000', isActive: true,
     });
@@ -30,7 +30,7 @@ async function seedEncounter(t: ReturnType<typeof convexTest>) {
       phoneLoginKey: 'dz213555810002', isActive: true,
     });
     const patientUserId = await ctx.db.insert('users', {
-      tokenIdentifier: 'clerk|notes-patient', fullName: 'المريض', role: 'patient',
+      tokenIdentifier: 'clerk|notes-patient', fullName: 'العميل', role: 'patient',
       phone: '+213555810003', phoneNormalized: '+213555810003',
       phoneLoginKey: 'dz213555810003', isActive: true,
     });
@@ -46,7 +46,7 @@ async function seedEncounter(t: ReturnType<typeof convexTest>) {
       userId: patientUserId, chronicDiseases: [], allergies: [],
     });
     const clinicId = await ctx.db.insert('clinics', {
-      ownerUserId: clinicUserId, name: 'عيادة النبض', wilayaId,
+      ownerUserId: clinicUserId, name: 'مركز النبض', wilayaId,
       phone: '+213555810000', isActive: true,
     });
     const now = Date.now();

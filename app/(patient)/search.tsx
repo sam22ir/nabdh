@@ -146,11 +146,11 @@ function ClinicResultCard({
 
       <View style={styles.clinicResultFooter}>
         <Text style={styles.clinicResultDoctorCount}>
-          {clinic.acceptedDoctorCount ?? 0} أطباء
+          {clinic.acceptedDoctorCount ?? 0} مختصين
         </Text>
         {isBookable ? (
           <View style={styles.clinicResultAction}>
-            <Text style={styles.clinicResultActionText}>اختيار العيادة</Text>
+            <Text style={styles.clinicResultActionText}>اختيار المركز</Text>
             <Ionicons
               name="arrow-back"
               size={16}
@@ -159,7 +159,7 @@ function ClinicResultCard({
           </View>
         ) : (
           <Text style={styles.clinicResultUnavailable}>
-            لا توجد مواعيد عبر العيادة حالياً
+            لا توجد مواعيد عبر المركز حالياً
           </Text>
         )}
       </View>
@@ -607,7 +607,7 @@ export default function PatientSearchScreen() {
   if (isLoading && !dataSource) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <LoadingState label="جاري تحميل الأطباء..." />
+        <LoadingState label="جاري تحميل المختصين..." />
       </SafeAreaView>
     );
   }
@@ -616,7 +616,7 @@ export default function PatientSearchScreen() {
     <>
       <View style={styles.searchHeader}>
         <DoctorHeader
-          title="ابحث عن طبيب أو عيادة"
+          title="ابحث عن مختص أو مركز"
           titleContent={
             <View style={styles.searchGreetingBlock}>
               <View style={styles.searchHeroIcon}>
@@ -627,7 +627,7 @@ export default function PatientSearchScreen() {
                 />
               </View>
               <Text style={styles.searchGreetingTitle} numberOfLines={1}>
-                ابحث عن طبيب أو عيادة
+                ابحث عن مختص أو مركز
               </Text>
               <View style={styles.searchGreetingSpacer} />
             </View>
@@ -639,8 +639,8 @@ export default function PatientSearchScreen() {
         <View style={styles.searchControls}>
           <View style={styles.searchModeTabs}>
             {([
-              { value: 'doctors', label: 'الأطباء' },
-              { value: 'clinics', label: 'العيادات' },
+              { value: 'doctors', label: 'المختصين' },
+              { value: 'clinics', label: 'المراكز' },
             ] as const).map((mode) => {
               const selected = searchMode === mode.value;
               return (
@@ -682,7 +682,7 @@ export default function PatientSearchScreen() {
           {selectedSpecialty ? (
             <View style={styles.appliedFilterRow}>
               <View style={styles.appliedFilterIcon}>
-                <Ionicons name="medkit-outline" size={15} color={theme.colors.official} />
+                <Ionicons name="briefcase-outline" size={15} color={theme.colors.official} />
               </View>
               <Text style={styles.appliedFilterText}>
                 التخصص: {selectedSpecialty.nameAr}
@@ -704,7 +704,7 @@ export default function PatientSearchScreen() {
 
       <View style={styles.resultsInfo}>
         <Text style={styles.resultsCountText}>
-          {`إجمالي نتائج ${searchMode === 'doctors' ? 'الأطباء' : 'العيادات'} ${resultCount}`}
+          {`إجمالي نتائج ${searchMode === 'doctors' ? 'المختصين' : 'المراكز'} ${resultCount}`}
         </Text>
         {activeFiltersCount > 0 ? (
           <TouchableOpacity
@@ -739,8 +739,8 @@ export default function PatientSearchScreen() {
                   icon="search-outline"
                   title={
                     searchMode === 'doctors'
-                      ? 'لا يوجد أطباء مطابقين لبحثك'
-                      : 'لا توجد عيادات مطابقة لبحثك'
+                      ? 'لا يوجد مختصون مطابقون لبحثك'
+                      : 'لا توجد مراكز مطابقة لبحثك'
                   }
                   subtitle="حاول تغيير كلمات البحث أو الولاية"
                 />
@@ -786,7 +786,7 @@ export default function PatientSearchScreen() {
               <View style={styles.modalHeaderCopy}>
                 <Text style={styles.modalTitle}>تصفية النتائج</Text>
                 <Text style={styles.modalSubtitle}>
-                  اختر ما يساعدك على الوصول للطبيب المناسب بسرعة.
+                  اختر ما يساعدك على الوصول للمختص المناسب بسرعة.
                 </Text>
               </View>
               <Pressable
@@ -818,7 +818,7 @@ export default function PatientSearchScreen() {
               >
                 <View style={styles.filterPanelCardIcon}>
                   <Ionicons
-                    name="medkit-outline"
+                    name="briefcase-outline"
                     size={18}
                     color={theme.colors.official}
                   />
@@ -898,7 +898,7 @@ export default function PatientSearchScreen() {
                 <View style={styles.filterPanelCardBody}>
                   <Text style={styles.filterPanelLabel}>متاح اليوم</Text>
                   <Text style={styles.filterPanelHint}>
-                    اعرض الأطباء الذين لديهم مواعيد متاحة الآن.
+                    اعرض المختصين الذين لديهم مواعيد متاحة الآن.
                   </Text>
                 </View>
                 <View

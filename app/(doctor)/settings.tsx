@@ -198,7 +198,7 @@ export default function DoctorSettingsScreen() {
       >
         <View style={styles.modalBody}>
           <Text style={styles.modalText}>
-            هل أنت متأكد من تسجيل الخروج من حساب الطبيب؟
+            هل أنت متأكد من تسجيل الخروج من حساب المختص؟
           </Text>
           <View style={styles.logoutActions}>
             <Pressable

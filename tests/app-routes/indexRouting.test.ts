@@ -9,9 +9,9 @@ describe('root role choice', () => {
   test('renders role choice for signed-out users', () => {
     const source = indexSource();
     expect(source).toContain('اختر نوع الحساب');
-    expect(source).toContain('مريض');
-    expect(source).toContain('طبيب');
-    expect(source).toContain('عيادة');
+    expect(source).toContain('عميل');
+    expect(source).toContain('مختص');
+    expect(source).toContain('مركز');
     expect(source).toContain('setStoredAuthRole');
     expect(source).toContain('تسجيل الدخول');
     expect(source).toContain('إنشاء حساب');

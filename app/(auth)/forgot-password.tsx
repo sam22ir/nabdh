@@ -19,9 +19,9 @@ import { theme } from '@/lib/theme';
 type Step = 'email' | 'reset';
 
 const ROLE_LABELS: Record<PublicAuthRole, string> = {
-  patient: 'المريض',
-  doctor: 'الطبيب',
-  clinic: 'العيادة',
+  patient: 'العميل',
+  doctor: 'المختص',
+  clinic: 'المركز',
 };
 
 function isRole(value: string | undefined): value is PublicAuthRole {

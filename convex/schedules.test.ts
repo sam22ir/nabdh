@@ -41,7 +41,7 @@ async function seedAcceptedClinicDoctor(t: ReturnType<typeof convexTest>) {
     });
     const clinicUserId = await ctx.db.insert('users', {
       tokenIdentifier: 'clerk|schedule-clinic',
-      fullName: 'عيادة الجدول',
+      fullName: 'مركز الجدول',
       role: 'clinic',
       phone: '+213555820000',
       phoneNormalized: '+213555820000',
@@ -50,7 +50,7 @@ async function seedAcceptedClinicDoctor(t: ReturnType<typeof convexTest>) {
     });
     const clinicId = await ctx.db.insert('clinics', {
       ownerUserId: clinicUserId,
-      name: 'عيادة الجدول',
+      name: 'مركز الجدول',
       wilayaId,
       phone: '+213555820000',
       isActive: true,
@@ -121,7 +121,7 @@ async function seedAcceptedClinicWithTwoDoctors(t: ReturnType<typeof convexTest>
 
     const clinicUserId = await ctx.db.insert('users', {
       tokenIdentifier: 'clerk|schedule-clinic-two-doctors',
-      fullName: 'عيادة الجدول المتعدد',
+      fullName: 'مركز الجدول المتعدد',
       role: 'clinic',
       phone: '+213555833333',
       phoneNormalized: '+213555833333',
@@ -130,7 +130,7 @@ async function seedAcceptedClinicWithTwoDoctors(t: ReturnType<typeof convexTest>
     });
     const clinicId = await ctx.db.insert('clinics', {
       ownerUserId: clinicUserId,
-      name: 'عيادة الجدول المتعدد',
+      name: 'مركز الجدول المتعدد',
       wilayaId,
       phone: '+213555833333',
       isActive: true,
@@ -231,7 +231,7 @@ describe('schedule vacations', () => {
         clinicId: seeded.clinicId,
         exceptionType: 'full_day',
         exceptionDate: '2099-07-06',
-        reason: 'العيادة مغلقة',
+        reason: 'المركز مغلقة',
       },
     );
 
@@ -242,7 +242,7 @@ describe('schedule vacations', () => {
         doctorId: seeded.doctorId,
         exceptionType: 'full_day',
         exceptionDate: '2099-07-07',
-        reason: 'إجازة الطبيب',
+        reason: 'إجازة المختص',
       },
     );
 
@@ -280,7 +280,7 @@ describe('schedule vacations', () => {
         exceptionType: 'multi_day',
         exceptionDate: '2099-07-10',
         endDate: '2099-07-11',
-        reason: 'إجازة الطبيب داخل العيادة',
+        reason: 'إجازة المختص داخل المركز',
       },
     );
 

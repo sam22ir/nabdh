@@ -143,11 +143,11 @@ function SummaryCard({
   time: string;
 }) {
   const rows: { icon: keyof typeof Ionicons.glyphMap; label: string; value: string }[] = [
-    { icon: 'medical-outline', label: 'الطبيب', value: doctorName },
+    { icon: 'person-outline', label: 'المختص', value: doctorName },
     ...(specialtyName
       ? [{ icon: 'flask-outline' as const, label: 'التخصص', value: specialtyName }]
       : []),
-    { icon: 'business-outline', label: 'العيادة', value: clinicName },
+    { icon: 'business-outline', label: 'المركز', value: clinicName },
     { icon: 'location-outline', label: 'العنوان', value: address },
     { icon: 'calendar-outline', label: 'التاريخ', value: date },
     { icon: 'time-outline', label: 'الوقت', value: time },
@@ -364,8 +364,8 @@ export default function BookingConfirmScreen() {
     }
     if (!me.profile) {
       Alert.alert(
-        'أكمل ملفك الطبي',
-        'يرجى إكمال ملفك الطبي قبل تأكيد الحجز.',
+        'أكمل ملفك الشخصي',
+        'يرجى إكمال ملفك الشخصي قبل تأكيد الحجز.',
       );
       return;
     }
@@ -574,7 +574,7 @@ export default function BookingConfirmScreen() {
         {/* Note for doctor (optional) */}
         <View style={styles.section}>
           <FormInput
-            placeholder="ملاحظة للطبيب (اختياري)"
+            placeholder="ملاحظة للمختص (اختياري)"
             value={note}
             onChangeText={setNote}
             multiline

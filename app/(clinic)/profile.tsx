@@ -79,7 +79,7 @@ export default function ClinicProfileScreen() {
   const infoTiles = useMemo(
     () => [
       {
-        label: 'اسم العيادة',
+        label: 'اسم المركز',
         value: profile?.name ?? me?.fullName ?? '',
         icon: 'business-outline' as const,
       },
@@ -131,7 +131,7 @@ export default function ClinicProfileScreen() {
 
   const handleSave = async () => {
     if (!clinicName.trim() || !phone.trim() || !wilayaId) {
-      Alert.alert('البيانات غير مكتملة', 'اسم العيادة ورقم الهاتف والولاية مطلوبة.');
+      Alert.alert('البيانات غير مكتملة', 'اسم المركز ورقم الهاتف والولاية مطلوبة.');
       return;
     }
 
@@ -150,7 +150,7 @@ export default function ClinicProfileScreen() {
       const message =
         error instanceof Error && error.message
           ? error.message
-          : 'تعذر حفظ معلومات العيادة.';
+          : 'تعذر حفظ معلومات المركز.';
       Alert.alert('تعذر الحفظ', message);
     } finally {
       setIsSaving(false);
@@ -160,11 +160,11 @@ export default function ClinicProfileScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content}>
-        <DoctorHeader title="ملف العيادة" icon="business-outline" centerTitle />
+        <DoctorHeader title="ملف المركز" icon="business-outline" centerTitle />
 
         <DoctorSection
           title="معلومات أساسية"
-          subtitle="عرض سريع لبيانات العيادة التي يعتمد عليها المرضى عند الحجز"
+          subtitle="عرض سريع لبيانات المركز التي يعتمد عليها العملاء عند الحجز"
           action={
             <Pressable
               style={({ pressed }) => [
@@ -213,7 +213,7 @@ export default function ClinicProfileScreen() {
 
             <View style={styles.sheetHeader}>
               <View style={styles.sheetHeaderCopy}>
-                <Text style={styles.sheetTitle}>تعديل بيانات العيادة</Text>
+                <Text style={styles.sheetTitle}>تعديل بيانات المركز</Text>
                 <Text style={styles.sheetSubtitle}>
                   حرر البيانات في مساحة واحدة واضحة ثم احفظها دفعة واحدة.
                 </Text>
@@ -236,10 +236,10 @@ export default function ClinicProfileScreen() {
               keyboardShouldPersistTaps="handled"
             >
               <EditField
-                label="اسم العيادة"
+                label="اسم المركز"
                 value={clinicName}
                 onChangeText={setClinicName}
-                placeholder="اسم العيادة"
+                placeholder="اسم المركز"
               />
               <EditField
                 label="رقم الهاتف"
@@ -340,7 +340,7 @@ export default function ClinicProfileScreen() {
               <View style={styles.pickerHeaderCopy}>
                 <Text style={styles.pickerTitle}>اختيار الولاية</Text>
                 <Text style={styles.pickerSubtitle}>
-                  ابحث سريعاً ثم اختر الولاية المناسبة للعيادة.
+                  ابحث سريعاً ثم اختر الولاية المناسبة للمركز.
                 </Text>
               </View>
               <Pressable

@@ -2,6 +2,7 @@ import { paginationOptsValidator } from 'convex/server';
 import { ConvexError, v } from 'convex/values';
 import { mutation, query } from './_generated/server';
 import { getAuthedUser } from './lib/auth';
+import { neutralSpecialtyName } from './lib/specialties';
 
 async function getAuthedDoctor(ctx: any) {
   const user = await getAuthedUser(ctx);
@@ -98,8 +99,9 @@ async function doctorBookingCard(ctx: any, membership: any, preselectedDoctorId?
     specialtyId: doctor.specialtyId,
     specialty: {
       ...specialty,
-      nameAr: specialty.name,
-      nameFr: specialty.name,
+      name: neutralSpecialtyName(specialty.name),
+      nameAr: neutralSpecialtyName(specialty.name),
+      nameFr: neutralSpecialtyName(specialty.name),
     },
     avgRating: doctor.avgRating,
     totalReviews: doctor.totalReviews,
