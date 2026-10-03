@@ -35,7 +35,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
   onChangeText,
   onSubmit,
   onFilterPress,
-  placeholder = 'ابحث عن طبيب، تخصص، أو مدينة...',
+  placeholder = 'ابحث عن مختص، تخصص، أو مدينة...',
   containerStyle,
 }) => {
   const [internalValue, setInternalValue] = useState('');

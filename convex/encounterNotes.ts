@@ -139,7 +139,7 @@ export const listForBooking = query({
       return [{
         _id: `legacy:${booking._id}`,
         bookingId: booking._id,
-        authorName: doctorUser?.fullName ?? 'الطبيب',
+        authorName: doctorUser?.fullName ?? 'المختص',
         authorRole: 'doctor',
         visibility: 'care_team',
         content: booking.doctorNote,

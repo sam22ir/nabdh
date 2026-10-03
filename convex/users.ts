@@ -482,7 +482,7 @@ export const deleteMyDoctorAccount = mutation({
         await ctx.db.patch(booking._id, {
           status: 'cancelled',
           cancelledBy: 'system',
-          cancellationReason: 'تم حذف حساب الطبيب',
+          cancellationReason: 'تم حذف حساب المختص',
           cancelledAt: Date.now(),
         });
       }
@@ -582,7 +582,7 @@ export const deleteMyClinicAccount = mutation({
         await ctx.db.patch(booking._id, {
           status: 'cancelled',
           cancelledBy: 'system',
-          cancellationReason: 'تم حذف حساب العيادة',
+          cancellationReason: 'تم حذف حساب المركز',
           cancelledAt: Date.now(),
         });
       }

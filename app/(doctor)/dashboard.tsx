@@ -87,7 +87,7 @@ const STATUS_CONFIG: Record<
     backgroundColor: theme.colors.secondary,
   },
   in_room: {
-    label: 'داخل عند الطبيب',
+    label: 'داخل عند المختص',
     color: '#7C3AED',
     backgroundColor: '#F3E8FF',
   },
@@ -371,7 +371,7 @@ const AppointmentDetailModal: React.FC<AppointmentDetailModalProps> = ({
                 value={appointment.appointmentDate}
               />
               <DetailRow
-                icon="medical-outline"
+                icon="person-outline"
                 label="نوع الزيارة"
                 value={VISIT_TYPE_LABELS[appointment.visitType]}
               />
@@ -398,19 +398,19 @@ const AppointmentDetailModal: React.FC<AppointmentDetailModalProps> = ({
               <View style={styles.modalCompletedBanner}>
                 <Ionicons name="checkmark-done-circle" size={20} color={theme.colors.success} />
                 <Text style={styles.modalCompletedText}>
-                  تم تسجيل حضور المريض
+                  تم تسجيل حضور العميل
                 </Text>
               </View>
             )}
 
             {/* Doctor note */}
             <View style={styles.modalNoteSection}>
-              <Text style={styles.modalNoteTitle}>ملاحظة الطبيب</Text>
+              <Text style={styles.modalNoteTitle}>ملاحظة المختص</Text>
               <TextInput
                 style={styles.modalNoteInput}
                 value={doctorNote}
                 onChangeText={setDoctorNote}
-                placeholder="أضف ملاحظة عن المريض..."
+                placeholder="أضف ملاحظة عن العميل..."
                 placeholderTextColor={theme.colors.textSecondary}
                 multiline
                 textAlignVertical="top"
@@ -571,8 +571,8 @@ function DoctorClinicMembershipPanel({
 
   return (
     <DoctorSection
-      title="الانضمام إلى عيادة"
-      subtitle="ابحث عن العيادات أو راجع الدعوات والطلبات المعلقة."
+      title="الانضمام إلى مركز"
+      subtitle="ابحث عن المراكز أو راجع الدعوات والطلبات المعلقة."
     >
       <SegmentedControl
         options={[
@@ -592,13 +592,13 @@ function DoctorClinicMembershipPanel({
               <Text style={styles.clinicMembershipSubtitle}>
                 {acceptedClinic.clinic?.phone ||
                   acceptedClinic.clinic?.address ||
-                  'أنت عضو فعّال في هذه العيادة'}
+                  'أنت عضو فعّال في هذه المركز'}
               </Text>
             </View>
             <Badge label="عضو حالي" tone="success" />
           </View>
           <Button
-            label="مغادرة العيادة"
+            label="مغادرة المركز"
             variant="secondary"
             icon="exit-outline"
             loading={activeMembershipId === 'leave-clinic'}
@@ -612,7 +612,7 @@ function DoctorClinicMembershipPanel({
           <SearchBar
             value={searchText}
             onChangeText={onSearchTextChange}
-            placeholder="ابحث عن عيادة بالاسم أو العنوان"
+            placeholder="ابحث عن مركز بالاسم أو العنوان"
             containerStyle={styles.dashboardSearchBar}
           />
 
@@ -633,7 +633,7 @@ function DoctorClinicMembershipPanel({
                         {clinic.address ||
                           clinic.wilaya?.nameAr ||
                           clinic.phone ||
-                          'العيادة متاحة للانضمام'}
+                          'المركز متاح للانضمام'}
                       </Text>
                     </View>
                     {isAccepted ? (
@@ -650,7 +650,7 @@ function DoctorClinicMembershipPanel({
                   </View>
 
                   <Text style={styles.clinicMembershipMeta}>
-                    {clinic.acceptedDoctorCount ?? 0} أطباء داخل العيادة
+                    {clinic.acceptedDoctorCount ?? 0} مختصين داخل المركز
                   </Text>
 
                   {isAccepted ? null : pendingInvite ? (
@@ -694,7 +694,7 @@ function DoctorClinicMembershipPanel({
               );
             })
           ) : (
-            <Text style={styles.dashboardEmptyText}>لا توجد عيادات مطابقة حالياً</Text>
+            <Text style={styles.dashboardEmptyText}>لا توجد مراكز مطابقة حالياً</Text>
           )}
         </>
       ) : null}
@@ -746,7 +746,7 @@ function DoctorClinicMembershipPanel({
                   <Text style={styles.clinicMembershipSubtitle}>
                     {membership.clinic?.phone ||
                       membership.clinic?.address ||
-                      'بانتظار رد العيادة'}
+                      'بانتظار رد المركز'}
                   </Text>
                 </View>
                 <Badge label="طلب مرسل" tone="info" />
@@ -810,7 +810,7 @@ export default function DoctorDashboardScreen() {
   // ── Derived values ─────────────────────────────────────────────────────
   const todayArabic = useMemo(() => formatTodayArabic(), []);
   const doctorName =
-    me?.role === 'doctor' ? (me.fullName ?? 'الطبيب') : 'الطبيب';
+    me?.role === 'doctor' ? (me.fullName ?? 'المختص') : 'المختص';
   const doctorTitleName = stripArabicDoctorTitle(doctorName);
   const appointments = useMemo(
     () =>
@@ -980,8 +980,8 @@ export default function DoctorDashboardScreen() {
 
   const handleLeaveClinic = useCallback(async () => {
     Alert.alert(
-      'مغادرة العيادة',
-      'سيتم إلغاء المواعيد المستقبلية المرتبطة بعضويتك في هذه العيادة.',
+      'مغادرة المركز',
+      'سيتم إلغاء المواعيد المستقبلية المرتبطة بعضويتك في هذه المركز.',
       [
         { text: 'تراجع', style: 'cancel' },
         {
@@ -992,7 +992,7 @@ export default function DoctorDashboardScreen() {
               setActiveMembershipId('leave-clinic');
               await leaveClinic({});
             } catch (error) {
-              Alert.alert('تعذر مغادرة العيادة', getArabicError(error, 'حاول مرة أخرى.'));
+              Alert.alert('تعذر مغادرة المركز', getArabicError(error, 'حاول مرة أخرى.'));
             } finally {
               setActiveMembershipId(null);
             }
@@ -1052,12 +1052,12 @@ export default function DoctorDashboardScreen() {
         }
       >
         <DoctorHeader
-          title={`د. ${doctorTitleName}`}
+          title={`${doctorTitleName}`}
           titleContent={
             <View style={styles.dashboardGreetingBlock}>
               <Text style={styles.dashboardGreetingHello}>مرحباً</Text>
               <Text style={styles.dashboardGreetingName} numberOfLines={1}>
-                د. {doctorTitleName}
+                {doctorTitleName}
               </Text>
             </View>
           }
@@ -1098,7 +1098,7 @@ export default function DoctorDashboardScreen() {
         ) : null}
 
         <DoctorSection
-          title="المريض القادم"
+          title="العميل القادم"
           subtitle="أول موعد في الانتظار يحتاج انتباهك الآن"
         >
           {nextAppointment ? (
@@ -1116,14 +1116,14 @@ export default function DoctorDashboardScreen() {
             <View style={styles.emptyNextPatient}>
               <Ionicons name="checkmark-done-circle" size={32} color={theme.colors.success} />
               <Text style={styles.emptyNextPatientText}>
-                لا يوجد مرضى في الانتظار
+                لا يوجد عملاء في الانتظار
               </Text>
             </View>
           )}
         </DoctorSection>
 
         <DoctorSection
-          title="قائمة مرضى اليوم"
+          title="قائمة عملاء اليوم"
           subtitle="المواعيد في الانتظار والمكتملة مرتبة حسب الوقت"
         >
           {todayAppointments.length > 0 ? (

@@ -71,7 +71,7 @@ export default function SpecialtyPicker({
         accessibilityLabel="اختيار التخصص"
       >
         <View style={styles.triggerIcon}>
-          <Ionicons name="medical-outline" size={20} color={theme.colors.primary} />
+          <Ionicons name="person-outline" size={20} color={theme.colors.primary} />
         </View>
         <Text style={[styles.triggerText, !selected && styles.placeholder]} numberOfLines={1}>
           {selected ? specialtyDisplayName(selected) : 'اختر التخصص'}
@@ -131,7 +131,7 @@ export default function SpecialtyPicker({
                     accessibilityLabel={specialtyDisplayName(item)}
                   >
                     <View style={styles.optionIcon}>
-                      <Ionicons name="medical-outline" size={17} color={theme.colors.info} />
+                      <Ionicons name="person-outline" size={17} color={theme.colors.info} />
                     </View>
                     <Text style={styles.optionName}>{specialtyDisplayName(item)}</Text>
                     {isSelected ? (

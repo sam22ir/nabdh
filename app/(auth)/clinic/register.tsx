@@ -187,11 +187,11 @@ export default function ClinicRegisterScreen() {
     <View style={styles.screen}>
       <AuthBackButton />
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-      <Text style={styles.title}>إنشاء حساب عيادة</Text>
+      <Text style={styles.title}>إنشاء حساب مركز</Text>
       <TextInput
         value={clinicName}
         onChangeText={setClinicName}
-        placeholder="اسم العيادة"
+        placeholder="اسم المركز"
         style={styles.input}
       />
       <WilayaPicker
@@ -258,7 +258,7 @@ export default function ClinicRegisterScreen() {
         )}
       </Pressable>
       <Link href="/(auth)/clinic/login" style={styles.link}>
-        لدي حساب عيادة
+        لدي حساب مركز
       </Link>
       </ScrollView>
     </View>

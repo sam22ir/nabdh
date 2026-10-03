@@ -9,7 +9,7 @@ describe("getArabicErrorMessage", () => {
         new Error("Patient profile not found. Please complete registration."),
         "fallback",
       ),
-    ).toBe("يرجى إكمال ملفك الطبي قبل المتابعة.");
+    ).toBe("يرجى إكمال ملفك الشخصي قبل المتابعة.");
   });
 
   test("does not expose unknown raw technical messages", () => {

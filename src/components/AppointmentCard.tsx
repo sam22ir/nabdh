@@ -60,7 +60,7 @@ export interface AppointmentCardProps {
   onReschedule?: () => void;
   /** Called when the user taps "احجز مرة أخرى". */
   onBookAgain?: () => void;
-  /** Called when the user taps "قيم الطبيب". */
+  /** Called when the user taps "قيم المختص". */
   onReview?: () => void;
 }
 
@@ -149,7 +149,7 @@ export default function AppointmentCard({
     Linking.openURL(clinicMapUrl).catch(() => {
       Alert.alert(
         'تعذر فتح الموقع',
-        'لم نتمكن من فتح موقع العيادة على خرائط Google.',
+        'لم نتمكن من فتح موقع المركز على خرائط Google.',
       );
     });
   }, [clinicMapUrl]);
@@ -159,14 +159,14 @@ export default function AppointmentCard({
   const cardContent = (
     <Panel style={styles.panel}>
       <View style={styles.cardHeader}>
-        <Text style={styles.cardHeaderText}>موعد مع الطبيب</Text>
+        <Text style={styles.cardHeaderText}>موعد مع المختص</Text>
       </View>
 
       <View style={styles.identityBlock}>
         <AppAvatar name={doctorName} size={48} />
         <View style={styles.identityCopy}>
           <Text style={styles.doctorName} numberOfLines={1}>
-            د. {doctorName}
+            {doctorName}
           </Text>
           <Text style={styles.specialty} numberOfLines={1}>
             {specialty}
@@ -177,7 +177,7 @@ export default function AppointmentCard({
       <View style={styles.detailsCard}>
         <AppointmentFact
           icon="business-outline"
-          label="العيادة"
+          label="المركز"
           value={clinicName}
           tone="primary"
         />
@@ -199,7 +199,7 @@ export default function AppointmentCard({
             <View style={styles.factDivider} />
             <AppointmentFact
               icon="document-text-outline"
-              label="ملاحظة الطبيب"
+              label="ملاحظة المختص"
               value={appointment.doctorNote}
             />
           </>
@@ -228,14 +228,14 @@ export default function AppointmentCard({
               ]}
               onPress={handleOpenClinicLocation}
               accessibilityRole="button"
-              accessibilityLabel="فتح موقع العيادة على خرائط Google"
+              accessibilityLabel="فتح موقع المركز على خرائط Google"
             >
               <Ionicons
                 name="navigate-outline"
                 size={18}
                 color={theme.colors.official}
               />
-              <Text style={styles.locationButtonText}>موقع العيادة</Text>
+              <Text style={styles.locationButtonText}>موقع المركز</Text>
             </Pressable>
           ) : null}
 
@@ -296,10 +296,10 @@ export default function AppointmentCard({
                   ]}
                   onPress={handleReview}
                   accessibilityRole="button"
-                  accessibilityLabel="قيم الطبيب"
+                  accessibilityLabel="قيم المختص"
                 >
                   <Text style={[styles.actionText, styles.actionTextPrimary]}>
-                    قيم الطبيب
+                    قيم المختص
                   </Text>
                 </Pressable>
               )}
@@ -319,7 +319,7 @@ export default function AppointmentCard({
       style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`موعد مع الدكتور ${doctorName}`}
+      accessibilityLabel={`موعد مع ${doctorName}`}
     >
       {cardContent}
     </Pressable>

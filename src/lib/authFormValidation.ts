@@ -6,7 +6,7 @@ export type FormErrors = Record<string, string>;
 
 const messages = {
   fullName: 'الاسم مطلوب',
-  clinicName: 'اسم العيادة مطلوب',
+  clinicName: 'اسم المركز مطلوب',
   gender: 'اختر الجنس',
   phone: 'رقم هاتف جزائري صحيح مطلوب',
   email: 'البريد الإلكتروني غير صحيح',
@@ -147,7 +147,7 @@ export function validateLogin(input: LoginInput): FormErrors {
 }
 
 export function roleLabel(role: PublicAuthRole): string {
-  if (role === 'patient') return 'مريض';
-  if (role === 'doctor') return 'طبيب';
-  return 'عيادة';
+  if (role === 'patient') return 'عميل';
+  if (role === 'doctor') return 'مختص';
+  return 'مركز';
 }

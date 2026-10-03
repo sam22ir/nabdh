@@ -37,7 +37,7 @@ const SpecialtyGrid: React.FC<SpecialtyGridProps> = ({
   const renderItem = useCallback(
     ({ item }: { item: SpecialtyItem }) => {
       const iconName = (
-        item.icon in Ionicons.glyphMap ? item.icon : 'medical-outline'
+        item.icon in Ionicons.glyphMap ? item.icon : 'person-outline'
       ) as keyof typeof Ionicons.glyphMap;
 
       return (

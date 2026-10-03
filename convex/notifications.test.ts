@@ -20,7 +20,7 @@ async function seedBookingScenario(t: ReturnType<typeof convexTest>) {
     });
     const doctorUserId = await ctx.db.insert('users', {
       tokenIdentifier: 'clerk|doctor-notifications',
-      fullName: 'طبيب التنبيهات',
+      fullName: 'مختص التنبيهات',
       gender: 'male',
       role: 'doctor',
       phone: '+213555444444',
@@ -40,7 +40,7 @@ async function seedBookingScenario(t: ReturnType<typeof convexTest>) {
     });
     const patientUserId = await ctx.db.insert('users', {
       tokenIdentifier: 'clerk|patient-notifications',
-      fullName: 'مريضة التنبيهات',
+      fullName: 'عميلة التنبيهات',
       gender: 'female',
       role: 'patient',
       phone: '+213555555555',
@@ -59,7 +59,7 @@ async function seedBookingScenario(t: ReturnType<typeof convexTest>) {
     });
     const clinicUserId = await ctx.db.insert('users', {
       tokenIdentifier: 'clerk|clinic-notifications',
-      fullName: 'عيادة التنبيهات',
+      fullName: 'مركز التنبيهات',
       role: 'clinic',
       phone: '+213555666666',
       phoneNormalized: '+213555666666',
@@ -69,9 +69,9 @@ async function seedBookingScenario(t: ReturnType<typeof convexTest>) {
     const clinicId = await ctx.db.insert('clinics', {
       ownerUserId: clinicUserId,
       doctorId,
-      name: 'عيادة التنبيهات',
+      name: 'مركز التنبيهات',
       wilayaId,
-      address: 'شارع الطبيب',
+      address: 'شارع المختص',
       phone: '+213555444444',
       isActive: true,
     });
@@ -128,7 +128,7 @@ describe('doctor booking notifications', () => {
       title: 'حجز جديد',
       isRead: false,
     });
-    expect(notifications[0].body).toContain('مريضة التنبيهات');
+    expect(notifications[0].body).toContain('عميلة التنبيهات');
   });
 
   test('booking cancel generates a doctor notification row', async () => {
@@ -175,7 +175,7 @@ describe('doctor booking notifications', () => {
       title: 'إلغاء موعد',
       isRead: false,
     });
-    expect(cancellationNotification?.body).toContain('مريضة التنبيهات');
+    expect(cancellationNotification?.body).toContain('عميلة التنبيهات');
   });
 
   test('daily summary creates a doctor notification only when the clinic setting is enabled', async () => {

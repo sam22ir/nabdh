@@ -11,7 +11,7 @@ export function getArabicErrorMessage(
   const rawMessage = getRawErrorMessage(error).toLowerCase();
 
   if (rawMessage.includes('patient profile not found')) {
-    return 'يرجى إكمال ملفك الطبي قبل المتابعة.';
+    return 'يرجى إكمال ملفك الشخصي قبل المتابعة.';
   }
 
   if (

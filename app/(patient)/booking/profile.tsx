@@ -2,7 +2,7 @@
 // =============================================================================
 // Booking – Profile Selection Screen (Step between datetime and confirmation)
 // Route: /(patient)/booking/profile
-// Shows "من سيزور الطبيب؟" with the user and their family sub-profiles.
+// Shows "من سيزور المختص؟" with the user and their family sub-profiles.
 // Selection is passed to the confirmation screen.
 //
 // RTL layout – Arabic‑first.
@@ -279,7 +279,7 @@ export default function BookingProfileScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Question title */}
-        <Text style={styles.questionTitle}>من سيزور الطبيب؟</Text>
+        <Text style={styles.questionTitle}>من سيزور المختص؟</Text>
 
         {/* "Myself" option – always shown */}
         <ProfileRadioItem

@@ -19,7 +19,7 @@ describe('seedReferenceData', () => {
     expect(wilayas[68]).toMatchObject({ id: 69, name: 'مسعد' });
   });
 
-  test('seeds the extended medical specialty catalog without duplicates', async () => {
+  test('seeds the extended specialty catalog without duplicates', async () => {
     const t = convexTest(schema, modules);
 
     await t.mutation(api.seed.seedReferenceData, {});
@@ -27,18 +27,18 @@ describe('seedReferenceData', () => {
     const specialties = await t.query(api.specialties.list, {});
     const names = specialties.map((specialty) => specialty.name);
 
-    expect(names).toContain('التشريح المرضي');
+    expect(names).toContain('التشريح');
     expect(names).toContain('جراحة الوجه والفكين');
     expect(names).toContain('جراحة الصدر');
-    expect(names).toContain('علم الأوبئة والطب الوقائي');
+    expect(names).toContain('الوقاية');
     expect(names).toContain('علم المناعة');
-    expect(names).toContain('الأحياء الدقيقة الطبية');
+    expect(names).toContain('الأحياء الدقيقة');
     expect(names).toContain('علم الطفيليات');
-    expect(names).toContain('الكيمياء الحيوية الطبية');
-    expect(names).toContain('الإنعاش الطبي');
-    expect(names).toContain('علاج الأورام بالإشعاع');
-    expect(names).toContain('طب حديثي الولادة');
-    expect(names).toContain('طب الألم');
+    expect(names).toContain('الكيمياء الحيوية');
+    expect(names).toContain('الإنعاش');
+    expect(names).toContain('الأورام والإشعاع');
+    expect(names).toContain('حديثي الولادة');
+    expect(names).toContain('الألم');
     expect(new Set(names).size).toBe(names.length);
   });
 });

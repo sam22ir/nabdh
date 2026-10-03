@@ -197,7 +197,7 @@ export default function DoctorRegisterScreen() {
     <View style={styles.screen}>
       <AuthBackButton />
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-      <Text style={styles.title}>إنشاء حساب طبيب</Text>
+      <Text style={styles.title}>إنشاء حساب مختص</Text>
       <TextInput value={fullName} onChangeText={setFullName} placeholder="الاسم الكامل" style={styles.input} />
       <View style={styles.segment}>
         {(['male', 'female'] as const).map((value) => (
@@ -237,7 +237,7 @@ export default function DoctorRegisterScreen() {
       <Pressable style={styles.button} onPress={() => void handleSubmit()}>
         {submitting ? <ActivityIndicator color={theme.colors.white} /> : <Text style={styles.buttonText}>إنشاء الحساب</Text>}
       </Pressable>
-      <Link href="/(auth)/doctor/login" style={styles.link}>لدي حساب طبيب</Link>
+      <Link href="/(auth)/doctor/login" style={styles.link}>لدي حساب مختص</Link>
       </ScrollView>
     </View>
   );

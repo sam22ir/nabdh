@@ -48,7 +48,7 @@ describe("doctor screens use backend data", () => {
     expect(source).toContain("MetricStrip");
     expect(source).toContain("AppointmentWorkItem");
     expect(source).toContain("dashboardDatePill");
-    expect(source).toContain("قائمة مرضى اليوم");
+    expect(source).toContain("قائمة عملاء اليوم");
     expect(source).not.toContain("قائمة تشغيل اليوم");
   });
 
@@ -101,10 +101,10 @@ describe("doctor screens use backend data", () => {
       dashboardSource.indexOf("<MetricStrip"),
     );
 
-    expect(dashboardSource).toContain("me.fullName ?? 'الطبيب'");
+    expect(dashboardSource).toContain("me.fullName ?? 'المختص'");
     expect(dashboardSource).toContain("titleContent=");
     expect(dashboardSource).toContain('<Text style={styles.dashboardGreetingHello}>مرحباً</Text>');
-    expect(dashboardSource).toContain("د. {doctorTitleName}");
+    expect(dashboardSource).toContain("{doctorTitleName}");
     expect(dashboardSource).not.toContain('title={`مرحباً، د. ${doctorTitleName}`}');
     expect(dashboardSource).not.toContain("getGreeting");
     expect(dashboardSource).not.toContain("صباح الخير");
@@ -119,8 +119,8 @@ describe("doctor screens use backend data", () => {
     expect(dashboardSource).toContain("dashboardGreetingName");
     expect(primitiveSource).toContain("titleContent?: React.ReactNode");
     expect(dashboardSource).toContain("{todayArabic}");
-    expect(dashboardSource).not.toContain('eyebrow="عيادة اليوم"');
-    expect(dashboardSource).not.toContain("راقب قائمة تشغيل اليوم وحدد المريض القادم بسرعة");
+    expect(dashboardSource).not.toContain('eyebrow="مركز اليوم"');
+    expect(dashboardSource).not.toContain("راقب قائمة تشغيل اليوم وحدد العميل القادم بسرعة");
     expect(dashboardSource).toContain("showIcon={false}");
     expect(primitiveSource).toContain("showIcon?: boolean");
     expect(primitiveSource).toContain("showIcon &&");
@@ -149,7 +149,7 @@ describe("doctor screens use backend data", () => {
     expect(source).toContain("MetricStrip");
     expect(source).not.toContain("جاهزية الملف العام");
     expect(source).not.toContain("اكتملت ${completionStats.complete}");
-    expect(source).not.toContain("بيانات عامة. بيانات الثقة العامة تظهر للمرضى");
+    expect(source).not.toContain("بيانات عامة. بيانات الثقة العامة تظهر للعملاء");
     expect(source).not.toContain("fullNameFr");
     expect(source).not.toContain("الاسم الكامل (فرنسي)");
     expect(source).not.toContain("bioFr");
@@ -157,7 +157,7 @@ describe("doctor screens use backend data", () => {
     expect(source).not.toContain("Votre parcours professionnel");
     expect(source).toContain('label="وصف قصير"');
     expect(source).toContain("الوصف القصير يجب أن لا يتجاوز 120 حرفاً");
-    expect(source).toContain("مثال: طبيب مختص بخبرة في المتابعة اليومية");
+    expect(source).toContain("مثال: مختص مختص بخبرة في المتابعة اليومية");
     expect(source).not.toContain("السيرة الذاتية (عربي)");
     expect(source).not.toContain("نبذة عن مسيرتك المهنية");
     expect(source).not.toContain("subSpecialties");
@@ -213,7 +213,7 @@ describe("doctor screens use backend data", () => {
     expect(source).not.toContain("للقراءة فقط");
     expect(source).not.toContain("emailDisplayRow");
     expect(source).not.toContain("بيانات الثقة العامة");
-    expect(source).not.toContain("الاسم، الهاتف، والتخصص هي أول إشارات يراجعها المريض");
+    expect(source).not.toContain("الاسم، الهاتف، والتخصص هي أول إشارات يراجعها العميل");
     expect(source).toContain("PROFILE_FIELD_ORDER");
     expect(source).toContain("profileScrollRef.current?.scrollTo");
     expect(source).toContain("registerProfileFieldLayout('fullNameAr')");
@@ -362,8 +362,8 @@ describe("doctor screens use backend data", () => {
     expect(source).not.toContain("handleEditClinic");
     expect(source).not.toContain("handleDeactivateClinic");
     expect(source).not.toContain("clinicMapInput");
-    expect(source).not.toContain('title="العيادات"');
-    expect(source).not.toContain("بيانات العيادات تحدد أين يمكن للمرضى الحجز");
+    expect(source).not.toContain('title="المراكز"');
+    expect(source).not.toContain("بيانات المراكز تحدد أين يمكن للعملاء الحجز");
   });
 
   test("profile specialty picker labels options from specialties.list display names", () => {
@@ -419,7 +419,7 @@ describe("doctor screens use backend data", () => {
     expect(source).toContain("blurOnSubmit={false}");
     expect(source).toContain("status: selectedStatus ?? undefined");
     expect(source).toContain("visitType: selectedVisitType ?? undefined");
-    expect(source).toContain("ابحث باسم المريض أو رقم الهاتف");
+    expect(source).toContain("ابحث باسم العميل أو رقم الهاتف");
     expect(source).toContain("حالة الموعد");
     expect(source).toContain("نوع الزيارة");
     expect(source).not.toContain("filteredAppointments");
@@ -437,12 +437,12 @@ describe("doctor screens use backend data", () => {
     );
 
     expect(renderSource.indexOf("<DoctorHeader")).toBeLessThan(
-      renderSource.indexOf("ابحث باسم المريض أو رقم الهاتف"),
+      renderSource.indexOf("ابحث باسم العميل أو رقم الهاتف"),
     );
-    expect(renderSource).not.toContain('title="فلترة المرضى"');
+    expect(renderSource).not.toContain('title="فلترة العملاء"');
     expect(renderSource).not.toContain("ابحث وفلتر حسب الحالة، نوع الزيارة، والفترة");
     expect(renderSource).not.toContain("ثم ضيق النتائج حسب الحالة أو نوع الزيارة");
-    expect(renderSource.indexOf("ابحث باسم المريض أو رقم الهاتف")).toBeLessThan(
+    expect(renderSource.indexOf("ابحث باسم العميل أو رقم الهاتف")).toBeLessThan(
       renderSource.indexOf('title="فرز حسب الفترة"'),
     );
     expect(renderSource.indexOf('title="فرز حسب الفترة"')).toBeLessThan(
@@ -463,7 +463,7 @@ describe("doctor screens use backend data", () => {
     expect(source).toContain("filterSheetVisible");
     expect(source).toContain("draftSelectedStatus");
     expect(source).toContain("draftSelectedVisitType");
-    expect(source).toContain('accessibilityLabel="فتح فلاتر المرضى"');
+    expect(source).toContain('accessibilityLabel="فتح فلاتر العملاء"');
     expect(source).toContain("styles.searchFilterButton");
     expect(source).toContain("styles.filterSheet");
     expect(source).toContain("FilterChipGroup");
@@ -558,7 +558,7 @@ describe("doctor screens use backend data", () => {
     expect(source).toContain("disabled={!cancelReason.trim()}");
     expect(source).toContain("onCancelAppointment(appointment.id, cancelReason.trim())");
     expect(source).toContain("cancellationReason: reason");
-    expect(source).not.toContain("cancellationReason: 'إلغاء من الطبيب'");
+    expect(source).not.toContain("cancellationReason: 'إلغاء من المختص'");
     expect(source).toContain("status: 'no_show' as AppointmentStatus");
   });
 

@@ -18,7 +18,7 @@ const ARABIC_LABELS: Record<string, string> = {
   dashboard: "لوحتي",
   appointments: "المواعيد",
   schedule: "الجدول",
-  profile: "العيادة",
+  profile: "المركز",
   settings: "الإعدادات",
 };
 

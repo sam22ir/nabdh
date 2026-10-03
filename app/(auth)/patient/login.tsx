@@ -46,7 +46,7 @@ export default function PatientLoginScreen() {
         return;
       }
       if (account.role !== 'patient') {
-        setError('هذا الحساب ليس حساب مريض');
+        setError('هذا الحساب ليس حساب عميل');
         return;
       }
       const clerkIdentifier = buildClerkPasswordIdentifierFromLoginKey(
@@ -68,7 +68,7 @@ export default function PatientLoginScreen() {
         await signOut();
         setError(
           resolution.reason === 'role_mismatch'
-            ? 'هذا الحساب ليس حساب مريض'
+            ? 'هذا الحساب ليس حساب عميل'
             : 'استخدم نفس رقم الهاتف المسجل',
         );
         return;
@@ -85,7 +85,7 @@ export default function PatientLoginScreen() {
   return (
     <View style={styles.container}>
       <AuthBackButton />
-      <Text style={styles.title}>دخول المريض</Text>
+      <Text style={styles.title}>دخول العميل</Text>
       <TextInput
         value={phone}
         onChangeText={setPhone}
@@ -112,7 +112,7 @@ export default function PatientLoginScreen() {
         نسيت كلمة المرور؟
       </Link>
       <Link href="/(auth)/patient/register" style={styles.link}>
-        إنشاء حساب مريض
+        إنشاء حساب عميل
       </Link>
     </View>
   );

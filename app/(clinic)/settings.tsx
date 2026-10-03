@@ -73,14 +73,14 @@ export default function ClinicSettingsScreen() {
     () =>
       autoCompleteAppointments
         ? 'عند نهاية مدة الموعد ينتقل تلقائياً إلى تم.'
-        : 'يبقى الموعد داخل عند الطبيب حتى يغيّره موظف العيادة يدوياً.',
+        : 'يبقى الموعد داخل عند المختص حتى يغيّره موظف المركز يدوياً.',
     [autoCompleteAppointments],
   );
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content}>
-        <DoctorHeader title="إعدادات العيادة" icon="settings-outline" centerTitle />
+        <DoctorHeader title="إعدادات المركز" icon="settings-outline" centerTitle />
 
         <DoctorSection title="المواعيد">
           <View style={styles.settingRow}>
@@ -104,7 +104,7 @@ export default function ClinicSettingsScreen() {
               <View style={styles.settingCopy}>
                 <Text style={styles.settingTitle}>تنبيهات الحجوزات الجديدة</Text>
                 <Text style={styles.settingDescription}>
-                  إشعار عند إنشاء موعد جديد داخل العيادة.
+                  إشعار عند إنشاء موعد جديد داخل المركز.
                 </Text>
               </View>
               <Switch
@@ -122,7 +122,7 @@ export default function ClinicSettingsScreen() {
               <View style={styles.settingCopy}>
                 <Text style={styles.settingTitle}>تنبيهات الإلغاء</Text>
                 <Text style={styles.settingDescription}>
-                  إشعار عند إلغاء أحد المواعيد داخل العيادة.
+                  إشعار عند إلغاء أحد المواعيد داخل المركز.
                 </Text>
               </View>
               <Switch
@@ -140,7 +140,7 @@ export default function ClinicSettingsScreen() {
               <View style={styles.settingCopy}>
                 <Text style={styles.settingTitle}>الملخص اليومي</Text>
                 <Text style={styles.settingDescription}>
-                  إرسال ملخص يومي لمواعيد الطبيب ضمن العيادة.
+                  إرسال ملخص يومي لمواعيد المختص ضمن المركز.
                 </Text>
               </View>
               <Switch

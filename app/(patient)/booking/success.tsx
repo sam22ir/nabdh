@@ -69,8 +69,8 @@ function SummaryCard({
     label: string;
     value: string;
   }[] = [
-    { icon: 'medical-outline', label: 'الطبيب', value: doctor },
-    { icon: 'business-outline', label: 'العيادة', value: clinic },
+    { icon: 'person-outline', label: 'المختص', value: doctor },
+    { icon: 'business-outline', label: 'المركز', value: clinic },
     { icon: 'calendar-outline', label: 'التاريخ', value: date },
     { icon: 'time-outline', label: 'الوقت', value: time },
   ];

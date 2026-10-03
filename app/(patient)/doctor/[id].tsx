@@ -266,7 +266,7 @@ function DoctorHeader({
       <View style={styles.headerIdentityRow}>
         <AppAvatar name={fullNameAr} size={64} />
         <View style={styles.headerIdentityCopy}>
-          <Text style={styles.doctorName}>{fullNameAr ?? 'طبيب'}</Text>
+          <Text style={styles.doctorName}>{fullNameAr ?? 'مختص'}</Text>
           <Text style={styles.specialtyText}>{specialtyNameAr}</Text>
           <View style={styles.ratingRow}>
             <StarsRow rating={avgRating} size={16} />
@@ -306,7 +306,7 @@ function StatsRow({
     {
       label: 'سنوات الخبرة',
       value: experienceYears != null ? `${experienceYears}+` : '---',
-      icon: 'medkit-outline',
+      icon: 'briefcase-outline',
     },
     {
       label: 'إجمالي التقييمات',
@@ -314,7 +314,7 @@ function StatsRow({
       icon: 'chatbubbles-outline',
     },
     {
-      label: 'المرضى',
+      label: 'العملاء',
       value: patientCount > 0 ? `${patientCount}` : '---',
       icon: 'people-outline',
     },
@@ -341,7 +341,7 @@ function StatsRow({
 function BioSection({ text }: { text: string }) {
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>نبذة عن الطبيب</Text>
+      <Text style={styles.sectionTitle}>نبذة عن المختص</Text>
       <Text style={styles.bioText}>{text}</Text>
     </View>
   );
@@ -375,7 +375,7 @@ function ClinicsSection({
 
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>العيادات</Text>
+      <Text style={styles.sectionTitle}>المراكز</Text>
       {clinics.map((clinic) => {
         const clinicSchedules = schedules.filter((s) => s.clinicId === clinic._id);
         const hoursSummary = summarizeWorkingHours(clinicSchedules);
@@ -426,10 +426,10 @@ function ClinicsSection({
                 ]}
                 onPress={() => handleOpenClinicMap(clinic)}
                 accessibilityRole="button"
-                accessibilityLabel={`اذهب إلى عيادة ${clinic.name}`}
+                accessibilityLabel={`اذهب إلى مركز ${clinic.name}`}
               >
                 <Ionicons name="navigate-outline" size={16} color={theme.colors.primary} />
-                <Text style={styles.clinicMapButtonText}>اذهب إلى العيادة</Text>
+                <Text style={styles.clinicMapButtonText}>اذهب إلى المركز</Text>
               </Pressable>
             ) : null}
 
@@ -541,7 +541,7 @@ function ReviewsSection({
                   />
                 </View>
                 <View style={styles.reviewAuthorRow}>
-                  <Text style={styles.reviewAuthor}>مريض</Text>
+                  <Text style={styles.reviewAuthor}>عميل</Text>
                   <StarsRow rating={review.overallRating} size={12} />
                 </View>
                 <Text style={styles.reviewDate}>
@@ -601,7 +601,7 @@ function BookingButton({
       <View style={styles.bottomBar}>
         {!isBookable || !acceptedClinicId ? (
           <Text style={styles.noSlotsHint}>
-            هذا الطبيب ظاهر في البحث، لكنه غير متاح للحجز عبر عيادة حالياً
+            هذا المختص ظاهر في البحث، لكنه غير متاح للحجز عبر مركز حالياً
           </Text>
         ) : null}
 
@@ -662,7 +662,7 @@ function LoadingScreen() {
   return (
     <View style={styles.centerContainer}>
       <ActivityIndicator size="large" color={theme.colors.primary} />
-      <Text style={styles.loadingText}>جاري تحميل الملف الطبي...</Text>
+      <Text style={styles.loadingText}>جاري تحميل الملف الشخصي...</Text>
     </View>
   );
 }
@@ -704,7 +704,7 @@ function NotFoundScreen() {
         size={56}
         color={theme.colors.textSecondary}
       />
-      <Text style={styles.errorTitle}>لم يتم العثور على الطبيب</Text>
+      <Text style={styles.errorTitle}>لم يتم العثور على المختص</Text>
       <Text style={styles.errorMessage}>
         قد يكون الحساب غير متاح أو تم حذفه.
       </Text>
@@ -775,8 +775,8 @@ export default function DoctorProfileScreen() {
 
     if (!me?.profile) {
       Alert.alert(
-        'أكمل ملفك الطبي',
-        'يرجى إكمال ملفك الطبي قبل إضافة الطبيب إلى المفضلة.',
+        'أكمل ملفك الشخصي',
+        'يرجى إكمال ملفك الشخصي قبل إضافة المختص إلى المفضلة.',
       );
       return;
     }
@@ -788,8 +788,8 @@ export default function DoctorProfileScreen() {
       if (!result.ok && result.error === 'patient_profile_missing') {
         setFavoriteOverride(previousFavorite);
         Alert.alert(
-          'أكمل ملفك الطبي',
-          'يرجى إكمال ملفك الطبي قبل إضافة الطبيب إلى المفضلة.',
+          'أكمل ملفك الشخصي',
+          'يرجى إكمال ملفك الشخصي قبل إضافة المختص إلى المفضلة.',
         );
         return;
       }
@@ -800,7 +800,7 @@ export default function DoctorProfileScreen() {
         'تعذر تحديث المفضلة',
         getArabicErrorMessage(
           error,
-          'يرجى تسجيل الدخول كمريض ثم المحاولة مرة أخرى.',
+          'يرجى تسجيل الدخول كعميل ثم المحاولة مرة أخرى.',
         ),
       );
     } finally {
@@ -851,7 +851,7 @@ export default function DoctorProfileScreen() {
   if (!id) {
     return (
       <ErrorScreen
-        message="رابط الطبيب غير صالح. يرجى العودة والمحاولة مرة أخرى."
+        message="رابط المختص غير صالح. يرجى العودة والمحاولة مرة أخرى."
         onRetry={() => {
           // Convex auto-refetches via reactivity.
         }}
@@ -865,7 +865,7 @@ export default function DoctorProfileScreen() {
   if (!doctorRaw && id) {
     return (
       <ErrorScreen
-        message="تعذر تحميل معلومات الطبيب. تحقق من اتصالك بالإنترنت."
+        message="تعذر تحميل معلومات المختص. تحقق من اتصالك بالإنترنت."
         onRetry={() => {
           // Convex auto-refetches via reactivity.
         }}

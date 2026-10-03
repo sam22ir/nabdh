@@ -57,9 +57,9 @@ const DoctorCard: React.FC<DoctorCardProps> = ({
         : 'حسب المواعيد';
   const bookingLabel =
     bookingMode === 'clinic'
-      ? 'الحجز عبر العيادة'
+      ? 'الحجز عبر المركز'
       : bookingMode === 'profile'
-        ? 'ملف الطبيب فقط'
+        ? 'ملف المختص فقط'
         : null;
 
   return (

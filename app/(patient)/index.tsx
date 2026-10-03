@@ -35,13 +35,13 @@ import type { Id } from '@/convex/_generated/dataModel';
 // =============================================================================
 
 const POPULAR_SPECIALTY_NAMES = [
-  'الطب العام',
-  'طب الأسنان',
-  'طب القلب',
-  'طب العيون',
-  'الأمراض الجلدية',
-  'طب الأطفال',
-  'أمراض النساء',
+  'استشارة عامة',
+  'الأسنان',
+  'القلب',
+  'العيون',
+  'الجلدية',
+  'الأطفال',
+  'النساء',
   'جراحة العظام',
 ];
 
@@ -56,11 +56,11 @@ function getSpecialtyIcon(nameAr: string, seedIcon?: string | null): string {
   if (nameAr.includes('نساء')) return 'woman-outline';
   if (nameAr.includes('عظام')) return 'walk-outline';
   if (nameAr.includes('عيون')) return 'eye-outline';
-  if (nameAr.includes('أنف') || nameAr.includes('أذن')) return 'medical-outline';
+  if (nameAr.includes('أنف') || nameAr.includes('أذن')) return 'person-outline';
   if (nameAr.includes('أعصاب')) return 'pulse-outline';
-  if (nameAr.includes('أسنان')) return 'medkit-outline';
+  if (nameAr.includes('أسنان')) return 'briefcase-outline';
 
-  return 'medical-outline';
+  return 'person-outline';
 }
 
 interface UpcomingAppointment extends Omit<Appointment, 'id' | 'profileId' | 'patientNote' | 'reason' | 'cancelledBy' | 'cancellationReason' | 'createdAt'> {
@@ -219,14 +219,14 @@ const UpcomingAppointmentCard: React.FC<UpcomingAppointmentCardProps> = ({
   onPress,
 }) => {
   const appointmentDateLabel = formatArabicDate(appointment.appointmentDate);
-  const clinicDisplayName = appointment.clinicName?.trim() || 'الطبيب ليس في عيادة';
+  const clinicDisplayName = appointment.clinicName?.trim() || 'المختص ليس في مركز';
   const handleOpenClinicLocation = useCallback(() => {
     if (!appointment.clinicMapUrl) return;
 
     Linking.openURL(appointment.clinicMapUrl).catch(() => {
       Alert.alert(
         'تعذر فتح الموقع',
-        'لم نتمكن من فتح موقع العيادة على خرائط Google.',
+        'لم نتمكن من فتح موقع المركز على خرائط Google.',
       );
     });
   }, [appointment.clinicMapUrl]);
@@ -241,7 +241,7 @@ const UpcomingAppointmentCard: React.FC<UpcomingAppointmentCardProps> = ({
           ]}
           onPress={onPress}
           accessibilityRole="button"
-          accessibilityLabel={`موعدك القادم مع الدكتور ${appointment.doctorName}`}
+          accessibilityLabel={`موعدك القادم مع ${appointment.doctorName}`}
         >
           <View style={styles.upcomingStatusRow}>
             <View style={styles.upcomingStatus}>
@@ -254,8 +254,8 @@ const UpcomingAppointmentCard: React.FC<UpcomingAppointmentCardProps> = ({
           <View style={styles.upcomingDoctorRow}>
             <AppAvatar name={appointment.doctorName} size={52} />
             <View style={styles.upcomingDoctorCopy}>
-              <Text style={styles.upcomingDoctorEyebrow}>الطبيب</Text>
-              <Text style={styles.upcomingDoctorName}>د. {appointment.doctorName}</Text>
+              <Text style={styles.upcomingDoctorEyebrow}>المختص</Text>
+              <Text style={styles.upcomingDoctorName}>{appointment.doctorName}</Text>
               <Text style={styles.upcomingSpecialty}>{appointment.specialty}</Text>
             </View>
           </View>
@@ -294,14 +294,14 @@ const UpcomingAppointmentCard: React.FC<UpcomingAppointmentCardProps> = ({
             ]}
             onPress={handleOpenClinicLocation}
             accessibilityRole="button"
-            accessibilityLabel="فتح موقع العيادة على خرائط Google"
+            accessibilityLabel="فتح موقع المركز على خرائط Google"
           >
             <Ionicons
               name="navigate-outline"
               size={17}
               color={theme.colors.official}
             />
-            <Text style={styles.upcomingLocationButtonText}>موقع العيادة</Text>
+            <Text style={styles.upcomingLocationButtonText}>موقع المركز</Text>
           </Pressable>
         ) : null}
       </Panel>
@@ -324,7 +324,7 @@ const UpcomingAppointmentModal: React.FC<UpcomingAppointmentModalProps> = ({
 
   const timePeriod = getArabicTimePeriod(appointment.appointmentTime);
   const dateParts = getAppointmentDateParts(appointment.appointmentDate);
-  const clinicDisplayName = appointment.clinicName?.trim() || 'الطبيب ليس في عيادة';
+  const clinicDisplayName = appointment.clinicName?.trim() || 'المختص ليس في مركز';
 
   return (
     <Modal
@@ -378,9 +378,9 @@ const UpcomingAppointmentModal: React.FC<UpcomingAppointmentModalProps> = ({
                   </View>
 
                   <View style={styles.ticketDoctorCopy}>
-                    <Text style={styles.ticketDoctorLabel}>الطبيب</Text>
+                    <Text style={styles.ticketDoctorLabel}>المختص</Text>
                     <Text style={styles.ticketDoctorName}>
-                      د. {appointment.doctorName}
+                      {appointment.doctorName}
                     </Text>
                   </View>
                 </View>
@@ -389,7 +389,7 @@ const UpcomingAppointmentModal: React.FC<UpcomingAppointmentModalProps> = ({
                   <View style={styles.ticketInlineRow}>
                     <View style={styles.ticketInlineIcon}>
                       <Ionicons
-                        name="medkit-outline"
+                        name="briefcase-outline"
                         size={16}
                         color={theme.colors.primary}
                       />
@@ -409,7 +409,7 @@ const UpcomingAppointmentModal: React.FC<UpcomingAppointmentModalProps> = ({
                       />
                     </View>
                     <View style={styles.ticketInlineCopy}>
-                      <Text style={styles.ticketInlineLabel}>العيادة</Text>
+                      <Text style={styles.ticketInlineLabel}>المركز</Text>
                       <Text style={styles.ticketInlineValue}>{clinicDisplayName}</Text>
                     </View>
                   </View>
@@ -702,7 +702,7 @@ export default function PatientHomeScreen() {
               />
             </View>
             <Text style={styles.dashboardIntroText}>
-              ابحث عن طبيب، راجع موعدك القادم، أو ابدأ حجزا جديدا.
+              ابحث عن مختص، راجع موعدك القادم، أو ابدأ حجزا جديدا.
             </Text>
           </View>
         </Panel>
@@ -722,7 +722,7 @@ export default function PatientHomeScreen() {
           <EmptyState
             icon="calendar-outline"
             title="لا يوجد موعد قادم"
-            subtitle="احجز موعدك مع أحد الأطباء لبدء رحلة علاجك"
+            subtitle="احجز موعدك مع أحد المختصين لبدء رحلتك"
             action={{ label: 'احجز موعد', onPress: handleBookAppointment }}
           />
         )}
@@ -738,8 +738,8 @@ export default function PatientHomeScreen() {
         <SectionHeader
           title={
             selectedSpecialty
-              ? `أطباء بالقرب منك - ${selectedSpecialty.nameAr}`
-              : 'أطباء بالقرب منك'
+              ? `مختصين بالقرب منك - ${selectedSpecialty.nameAr}`
+              : 'مختصين بالقرب منك'
           }
           actionLabel={selectedSpecialty ? 'إلغاء التصفية' : 'عرض الكل'}
           onAction={
@@ -760,15 +760,15 @@ export default function PatientHomeScreen() {
           </View>
         ) : (
           <EmptyState
-            icon="medical-outline"
+            icon="person-outline"
             title={
               selectedSpecialty
-                ? `لا يوجد أطباء قريبون في تخصص ${selectedSpecialty.nameAr}`
-                : 'لا يوجد أطباء قريبون'
+                ? `لا يوجد مختصون قريبون في تخصص ${selectedSpecialty.nameAr}`
+                : 'لا يوجد مختصون قريبون'
             }
-            subtitle="جرّب البحث لاختيار طبيب حسب التخصص أو الولاية"
+            subtitle="جرّب البحث لاختيار مختص حسب التخصص أو الولاية"
             action={{
-              label: 'ابحث عن طبيب',
+              label: 'ابحث عن مختص',
               onPress: () => {
                 if (selectedSpecialty) {
                   router.push(

@@ -24,7 +24,7 @@ async function seedDoctor(
     });
     const userId = await ctx.db.insert('users', {
       tokenIdentifier: 'clerk|doctor-search',
-      fullName: 'طبيب البحث',
+      fullName: 'مختص البحث',
       gender: 'female',
       role: 'doctor',
       phone: '+213555123456',
@@ -48,7 +48,7 @@ async function seedDoctor(
     });
     const clinicId = await ctx.db.insert('clinics', {
       doctorId,
-      name: 'عيادة البحث',
+      name: 'مركز البحث',
       wilayaId,
       address: 'شارع الاختبار',
       latitude: 36.75,
@@ -77,7 +77,7 @@ async function seedDoctorWithoutClinic(t: ReturnType<typeof convexTest>) {
     });
     const userId = await ctx.db.insert('users', {
       tokenIdentifier: 'clerk|doctor-no-clinic',
-      fullName: 'طبيب بلا عيادة',
+      fullName: 'مختص بلا مركز',
       gender: 'male',
       role: 'doctor',
       phone: '+213555930000',
@@ -117,8 +117,8 @@ describe('doctors public search', () => {
     ).resolves.toMatchObject({
       page: [
         {
-          user: { fullNameAr: 'طبيب البحث' },
-          specialty: { nameAr: 'طب القلب' },
+          user: { fullNameAr: 'مختص البحث' },
+          specialty: { nameAr: 'القلب' },
         },
       ],
       isDone: true,
@@ -140,8 +140,8 @@ describe('doctors public search', () => {
     ).resolves.toMatchObject({
       page: [
         {
-          user: { fullNameAr: 'طبيب البحث' },
-          specialty: { nameAr: 'طب القلب' },
+          user: { fullNameAr: 'مختص البحث' },
+          specialty: { nameAr: 'القلب' },
         },
       ],
       isDone: true,
@@ -201,7 +201,7 @@ describe('doctors public search', () => {
       page: [
         {
           _id: seeded.doctorId,
-          fullNameAr: 'طبيب بلا عيادة',
+          fullNameAr: 'مختص بلا مركز',
           isBookable: false,
           acceptedClinicId: null,
         },
@@ -215,7 +215,7 @@ describe('doctors public search', () => {
     const clinicId = await t.run(async (ctx) => {
       const clinicUserId = await ctx.db.insert('users', {
         tokenIdentifier: 'clerk|doctor-accepted-clinic',
-        fullName: 'عيادة الطبيب',
+        fullName: 'مركز المختص',
         role: 'clinic',
         phone: '+213555930001',
         phoneNormalized: '+213555930001',
@@ -224,7 +224,7 @@ describe('doctors public search', () => {
       });
       const createdClinicId = await ctx.db.insert('clinics', {
         ownerUserId: clinicUserId,
-        name: 'عيادة الطبيب',
+        name: 'مركز المختص',
         wilayaId: seeded.wilayaId,
         phone: '+213555930001',
         isActive: true,
@@ -256,7 +256,7 @@ describe('doctors public search', () => {
           clinics: [
             {
               _id: clinicId,
-              name: 'عيادة الطبيب',
+              name: 'مركز المختص',
             },
           ],
         },
@@ -272,11 +272,11 @@ describe('doctors public search', () => {
       t.withIdentity(identity('clerk|doctor-search')).mutation(
         api.doctors.updateProfile,
         {
-          fullNameAr: 'طبيب الملف',
+          fullNameAr: 'مختص الملف',
           email: ' DOCTOR.PROFILE@Example.TEST ',
           phone: '0550951413',
           specialtyId: seeded.specialtyId,
-          bioAr: 'سيرة الطبيب',
+          bioAr: 'سيرة المختص',
           yearsOfExperience: 9,
           consultationFee: 3000,
           followUpFee: 1500,
@@ -289,15 +289,15 @@ describe('doctors public search', () => {
       .query(api.doctors.getMyProfile, {});
 
     expect(profile).toMatchObject({
-      fullName: 'طبيب الملف',
+      fullName: 'مختص الملف',
       phone: '0550951413',
-      bio: 'سيرة الطبيب',
-      bioAr: 'سيرة الطبيب',
+      bio: 'سيرة المختص',
+      bioAr: 'سيرة المختص',
       yearsOfExperience: 9,
       consultationFee: 3000,
       followUpFee: 1500,
       user: {
-        fullNameAr: 'طبيب الملف',
+        fullNameAr: 'مختص الملف',
         email: 'DOCTOR.PROFILE@Example.TEST',
         phone: '0550951413',
       },
@@ -342,7 +342,7 @@ describe('doctors public search', () => {
       t.withIdentity(identity('clerk|doctor-search')).mutation(
         api.doctors.updateProfile,
         {
-          fullNameAr: 'طبيب بدون رقم نقابة',
+          fullNameAr: 'مختص بدون رقم نقابة',
           phone: '0550951413',
           specialtyId: seeded.specialtyId,
           bioAr: '',

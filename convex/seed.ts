@@ -191,7 +191,7 @@ async function ensureMockDoctor(ctx: any, clinicId: Id<'clinics'>) {
     existingUser?._id ??
     (await ctx.db.insert('users', {
       tokenIdentifier,
-      fullName: 'الدكتورة نادية بن سالم',
+      fullName: 'نادية بن سالم',
       gender: 'female',
       role: 'doctor',
       phone: '+213700000901',
@@ -213,7 +213,7 @@ async function ensureMockDoctor(ctx: any, clinicId: Id<'clinics'>) {
   return await ctx.db.insert('doctors', {
     userId,
     specialtyId,
-    bio: 'طبيبة تجريبية لاختبار مواعيد العيادة.',
+    bio: 'مختصة تجريبية لاختبار مواعيد المركز.',
     yearsOfExperience: 8,
     consultationFee: 2500,
     followUpFee: 1500,
@@ -330,7 +330,7 @@ export const seedMockDoctorForClinic = mutation({
         appointmentTime,
         appointmentDuration: 30,
         visitType: 'consultation',
-        reason: 'موعد تجريبي لاختبار تبديل الأطباء',
+        reason: 'موعد تجريبي لاختبار تبديل المختصين',
         status: 'confirmed',
         confirmedAt: now,
       }));

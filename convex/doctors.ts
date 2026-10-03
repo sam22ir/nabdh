@@ -4,6 +4,7 @@ import type { Doc } from './_generated/dataModel';
 import type { MutationCtx, QueryCtx } from './_generated/server';
 import { mutation, query } from './_generated/server';
 import { getAuthedUser } from './lib/auth';
+import { neutralSpecialtyName } from './lib/specialties';
 import { normalizeOptionalEmail } from './lib/identity';
 
 type DbCtx = QueryCtx | MutationCtx;
@@ -211,8 +212,9 @@ async function doctorCard(
     },
     specialty: {
       ...specialty,
-      nameAr: specialty.name,
-      nameFr: specialty.name,
+      name: neutralSpecialtyName(specialty.name),
+      nameAr: neutralSpecialtyName(specialty.name),
+      nameFr: neutralSpecialtyName(specialty.name),
     },
     specialtyId: doctor.specialtyId,
     wilaya: wilaya

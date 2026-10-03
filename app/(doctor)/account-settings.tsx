@@ -224,7 +224,7 @@ export default function DoctorAccountSettingsScreen() {
 
             <View style={styles.modalBody}>
               <Text style={styles.modalText}>
-                سيؤدي حذف الحساب إلى إزالة بيانات الطبيب النشطة، وإلغاء المواعيد
+                سيؤدي حذف الحساب إلى إزالة بيانات المختص النشطة، وإلغاء المواعيد
                 القادمة، ثم حذف حساب تسجيل الدخول نهائياً.
               </Text>
               <View style={styles.confirmationBlock}>

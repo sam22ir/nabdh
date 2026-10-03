@@ -33,22 +33,22 @@ const roles: Array<{
 }> = [
   {
     role: 'patient',
-    title: 'مريض',
+    title: 'عميل',
     subtitle: 'احجز موعدا وتابع مواعيدك',
     loginRoute: '/(auth)/patient/login',
     registerRoute: '/(auth)/patient/register',
   },
   {
     role: 'doctor',
-    title: 'طبيب',
-    subtitle: 'أنشئ ملفك الطبي المهني',
+    title: 'مختص',
+    subtitle: 'أنشئ ملفك المهني',
     loginRoute: '/(auth)/doctor/login',
     registerRoute: '/(auth)/doctor/register',
   },
   {
     role: 'clinic',
-    title: 'عيادة',
-    subtitle: 'أنشئ حساب العيادة وأدر الأطباء',
+    title: 'مركز',
+    subtitle: 'أنشئ حساب المركز وأدر المختصين',
     loginRoute: '/(auth)/clinic/login',
     registerRoute: '/(auth)/clinic/register',
   },
@@ -114,7 +114,7 @@ export default function IndexScreen() {
             item.role === 'patient'
               ? 'person-outline'
               : item.role === 'doctor'
-                ? 'medical-outline'
+                ? 'person-outline'
                 : 'business-outline';
           return (
             <Pressable

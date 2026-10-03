@@ -21,7 +21,7 @@ async function seedDoctorClinicWithSchedule(t: ReturnType<typeof convexTest>) {
     });
     const doctorUserId = await ctx.db.insert('users', {
       tokenIdentifier: 'clerk|doctor-clinic-active',
-      fullName: 'طبيب العيادة',
+      fullName: 'مختص المركز',
       gender: 'male',
       role: 'doctor',
       phone: '+213555900000',
@@ -45,7 +45,7 @@ async function seedDoctorClinicWithSchedule(t: ReturnType<typeof convexTest>) {
     });
     const clinicId = await ctx.db.insert('clinics', {
       doctorId,
-      name: 'عيادة التفعيل',
+      name: 'مركز التفعيل',
       wilayaId,
       address: 'وسط المدينة',
       latitude: 36.82,
@@ -122,7 +122,7 @@ describe('clinic active state', () => {
       });
       const doctorUserId = await ctx.db.insert('users', {
         tokenIdentifier: 'clerk|doctor-map-link',
-        fullName: 'طبيب الرابط',
+        fullName: 'مختص الرابط',
         gender: 'male',
         role: 'doctor',
         phone: '+213555900001',
@@ -151,7 +151,7 @@ describe('clinic active state', () => {
     const clinicId = await t.withIdentity(identity('clerk|doctor-map-link')).mutation(
       api.clinics.create,
       {
-        name: 'عيادة الرابط',
+        name: 'مركز الرابط',
         wilayaId: seeded.wilayaId,
         address: 'وسط المدينة',
         phone: '+213555900001',
@@ -175,7 +175,7 @@ describe('clinic active state', () => {
       });
       const clinicUserId = await ctx.db.insert('users', {
         tokenIdentifier: 'clerk|clinic-public-empty',
-        fullName: 'عيادة عامة',
+        fullName: 'مركز عامة',
         role: 'clinic',
         phone: '+213555910000',
         phoneNormalized: '+213555910000',
@@ -184,7 +184,7 @@ describe('clinic active state', () => {
       });
       const clinicId = await ctx.db.insert('clinics', {
         ownerUserId: clinicUserId,
-        name: 'عيادة عامة',
+        name: 'مركز عامة',
         wilayaId,
         phone: '+213555910000',
         isActive: true,
@@ -201,7 +201,7 @@ describe('clinic active state', () => {
       page: [
         {
           _id: seeded.clinicId,
-          name: 'عيادة عامة',
+          name: 'مركز عامة',
           isBookable: false,
           acceptedDoctorCount: 0,
           wilaya: { nameAr: 'الجزائر' },
@@ -224,7 +224,7 @@ describe('clinic active state', () => {
       });
       const clinicUserId = await ctx.db.insert('users', {
         tokenIdentifier: 'clerk|clinic-public-doctor',
-        fullName: 'عيادة الأطباء',
+        fullName: 'مركز المختصين',
         role: 'clinic',
         phone: '+213555920000',
         phoneNormalized: '+213555920000',
@@ -233,14 +233,14 @@ describe('clinic active state', () => {
       });
       const clinicId = await ctx.db.insert('clinics', {
         ownerUserId: clinicUserId,
-        name: 'عيادة الأطباء',
+        name: 'مركز المختصين',
         wilayaId,
         phone: '+213555920000',
         isActive: true,
       });
       const doctorUserId = await ctx.db.insert('users', {
         tokenIdentifier: 'clerk|clinic-public-doctor-user',
-        fullName: 'د. داخل العيادة',
+        fullName: 'د. داخل المركز',
         gender: 'male',
         role: 'doctor',
         phone: '+213555920001',
@@ -277,13 +277,13 @@ describe('clinic active state', () => {
     ).resolves.toMatchObject({
       clinic: {
         _id: seeded.clinicId,
-        name: 'عيادة الأطباء',
+        name: 'مركز المختصين',
         isBookable: true,
       },
       doctors: [
         {
           _id: seeded.doctorId,
-          fullNameAr: 'د. داخل العيادة',
+          fullNameAr: 'د. داخل المركز',
           isPreselected: true,
         },
       ],

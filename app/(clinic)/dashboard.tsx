@@ -14,11 +14,11 @@ export default function ClinicDashboardScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content}>
-        <DoctorHeader title="لوحة العيادة" icon="business-outline" centerTitle />
+        <DoctorHeader title="لوحة المركز" icon="business-outline" centerTitle />
         <MetricStrip
           items={[
             {
-              label: 'الأطباء المتاحون للحجز اليوم',
+              label: 'المختصون المتاحون للحجز اليوم',
               value: availableDoctorCount,
               icon: 'people-outline',
               tone: availableDoctorCount > 0 ? 'info' : 'neutral',

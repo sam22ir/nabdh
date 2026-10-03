@@ -403,7 +403,7 @@ export default function PatientProfileScreen() {
       });
       setCompleteProfileModalVisible(false);
     } catch (error) {
-      setModalError(getArabicErrorMessage(error, 'تعذر إكمال الملف الطبي'));
+      setModalError(getArabicErrorMessage(error, 'تعذر إكمال الملف الشخصي'));
     } finally {
       setSavingCompletion(false);
     }
@@ -511,15 +511,15 @@ export default function PatientProfileScreen() {
           <View style={styles.completeProfileCard}>
             <View style={styles.completeProfileIcon}>
               <Ionicons
-                name="medical-outline"
+                name="person-outline"
                 size={24}
                 color={theme.colors.warning}
               />
             </View>
             <View style={styles.completeProfileTextArea}>
-              <Text style={styles.completeProfileTitle}>أكمل ملفك الطبي</Text>
+              <Text style={styles.completeProfileTitle}>أكمل ملفك الشخصي</Text>
               <Text style={styles.completeProfileDescription}>
-                أكمل تاريخ الميلاد والبلدية حتى تتمكن من الحجز وإضافة الأطباء
+                أكمل تاريخ الميلاد والبلدية حتى تتمكن من الحجز وإضافة المختصين
                 إلى المفضلة.
               </Text>
             </View>
@@ -530,7 +530,7 @@ export default function PatientProfileScreen() {
                 pressed && styles.editButtonPressed,
               ]}
               accessibilityRole="button"
-              accessibilityLabel="أكمل ملفك الطبي"
+              accessibilityLabel="أكمل ملفك الشخصي"
             >
               <Text style={styles.completeProfileButtonText}>إكمال</Text>
             </Pressable>
@@ -717,7 +717,7 @@ export default function PatientProfileScreen() {
 
       <ActionModal
         visible={completeProfileModalVisible}
-        title="أكمل ملفك الطبي"
+        title="أكمل ملفك الشخصي"
         onClose={() => setCompleteProfileModalVisible(false)}
       >
         <View style={styles.modalBody}>
@@ -848,10 +848,10 @@ export default function PatientProfileScreen() {
               (pressed || savingCompletion) && styles.modalButtonPressed,
             ]}
             accessibilityRole="button"
-            accessibilityLabel="حفظ الملف الطبي"
+            accessibilityLabel="حفظ الملف الشخصي"
           >
             <Text style={styles.modalPrimaryButtonText}>
-              {savingCompletion ? 'جاري الحفظ...' : 'حفظ الملف الطبي'}
+              {savingCompletion ? 'جاري الحفظ...' : 'حفظ الملف الشخصي'}
             </Text>
           </Pressable>
         </View>

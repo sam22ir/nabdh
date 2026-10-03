@@ -88,7 +88,7 @@ const STATUS_CONFIG: Record<
     backgroundColor: theme.colors.secondary,
   },
   in_room: {
-    label: 'داخل عند الطبيب',
+    label: 'داخل عند المختص',
     color: '#7C3AED',
     backgroundColor: '#F3E8FF',
   },
@@ -135,7 +135,7 @@ const STATUS_FILTER_OPTIONS: StatusFilterOption[] = [
   { key: 'all', label: 'الكل', icon: 'list-outline' },
   { key: 'confirmed', label: STATUS_CONFIG.confirmed.label, icon: 'checkmark-circle-outline' },
   { key: 'present', label: STATUS_CONFIG.present.label, icon: 'person-outline' },
-  { key: 'in_room', label: STATUS_CONFIG.in_room.label, icon: 'medical-outline' },
+  { key: 'in_room', label: STATUS_CONFIG.in_room.label, icon: 'person-outline' },
   { key: 'completed', label: STATUS_CONFIG.completed.label, icon: 'checkmark-done-outline' },
   { key: 'cancelled', label: STATUS_CONFIG.cancelled.label, icon: 'ban-outline' },
   { key: 'no_show', label: STATUS_CONFIG.no_show.label, icon: 'close-circle-outline' },
@@ -811,7 +811,7 @@ export default function DoctorAppointmentsScreen() {
         }
       >
         <DoctorHeader
-          title="مواعيد العيادة"
+          title="مواعيد المركز"
           icon={null}
         />
 
@@ -821,18 +821,18 @@ export default function DoctorAppointmentsScreen() {
             <TextInput
               value={patientSearchText}
               onChangeText={setPatientSearchText}
-              placeholder="ابحث باسم المريض أو رقم الهاتف"
+              placeholder="ابحث باسم العميل أو رقم الهاتف"
               placeholderTextColor={theme.colors.textMuted}
               style={styles.patientSearchInput}
               textAlign="right"
               returnKeyType="search"
               blurOnSubmit={false}
-              accessibilityLabel="بحث في المرضى"
+              accessibilityLabel="بحث في العملاء"
             />
             <Pressable
               onPress={handleOpenFilterSheet}
               accessibilityRole="button"
-              accessibilityLabel="فتح فلاتر المرضى"
+              accessibilityLabel="فتح فلاتر العملاء"
               style={({ pressed }) => [
                 styles.searchFilterButton,
                 activeFilterCount > 0 && styles.searchFilterButtonActive,
@@ -860,7 +860,7 @@ export default function DoctorAppointmentsScreen() {
               <Pressable
                 onPress={() => setPatientSearchText('')}
                 accessibilityRole="button"
-                accessibilityLabel="مسح بحث المرضى"
+                accessibilityLabel="مسح بحث العملاء"
                 hitSlop={8}
               >
                 <Ionicons
@@ -884,7 +884,7 @@ export default function DoctorAppointmentsScreen() {
         {/* ── Content ───────────────────────────────────────────────── */}
         <DoctorSection
           title="قائمة المواعيد"
-          subtitle="استخدمها للفرز وإضافة ملاحظات الطبيب"
+          subtitle="استخدمها للفرز وإضافة ملاحظات المختص"
         >
         {/* ─── Today Tab ──────────────────────────────────────── */}
         {activeTab === 'today' && (
@@ -1084,13 +1084,13 @@ export default function DoctorAppointmentsScreen() {
             style={styles.filterSheetBackdrop}
             onPress={() => setFilterSheetVisible(false)}
             accessibilityRole="button"
-            accessibilityLabel="إغلاق فلاتر المرضى"
+            accessibilityLabel="إغلاق فلاتر العملاء"
           />
           <View style={styles.filterSheet}>
             <View style={styles.filterSheetHandle} />
             <View style={styles.filterSheetHeader}>
               <View style={styles.filterSheetTitleBlock}>
-                <Text style={styles.filterSheetTitle}>فلاتر المرضى</Text>
+                <Text style={styles.filterSheetTitle}>فلاتر العملاء</Text>
                 <Text style={styles.filterSheetSubtitle}>
                   اختر الحالة ونوع الزيارة ثم طبق النتائج.
                 </Text>

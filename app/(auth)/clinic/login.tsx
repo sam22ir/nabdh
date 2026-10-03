@@ -46,7 +46,7 @@ export default function ClinicLoginScreen() {
         return;
       }
       if (account.role !== 'clinic') {
-        setError('هذا الحساب ليس حساب عيادة');
+        setError('هذا الحساب ليس حساب مركز');
         return;
       }
       const result = await signIn.create({
@@ -65,7 +65,7 @@ export default function ClinicLoginScreen() {
         await signOut();
         setError(
           resolution.reason === 'role_mismatch'
-            ? 'هذا الحساب ليس حساب عيادة'
+            ? 'هذا الحساب ليس حساب مركز'
             : 'استخدم نفس رقم الهاتف المسجل',
         );
         return;
@@ -82,7 +82,7 @@ export default function ClinicLoginScreen() {
   return (
     <View style={styles.container}>
       <AuthBackButton />
-      <Text style={styles.title}>دخول العيادة</Text>
+      <Text style={styles.title}>دخول المركز</Text>
       <TextInput
         value={phone}
         onChangeText={setPhone}
@@ -109,7 +109,7 @@ export default function ClinicLoginScreen() {
         نسيت كلمة المرور؟
       </Link>
       <Link href="/(auth)/clinic/register" style={styles.link}>
-        إنشاء حساب عيادة
+        إنشاء حساب مركز
       </Link>
     </View>
   );

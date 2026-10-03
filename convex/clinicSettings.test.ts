@@ -15,7 +15,7 @@ async function seedClinicUser(t: ReturnType<typeof convexTest>) {
   return await t.run(async (ctx) => {
     const userId = await ctx.db.insert('users', {
       tokenIdentifier: 'clerk|clinic-settings',
-      fullName: 'عيادة الإعدادات',
+      fullName: 'مركز الإعدادات',
       role: 'clinic',
       phone: '+213555333444',
       phoneNormalized: '+213555333444',
@@ -28,7 +28,7 @@ async function seedClinicUser(t: ReturnType<typeof convexTest>) {
     });
     await ctx.db.insert('clinics', {
       ownerUserId: userId,
-      name: 'عيادة الإعدادات',
+      name: 'مركز الإعدادات',
       wilayaId,
       phone: '+213555333444',
       isActive: true,

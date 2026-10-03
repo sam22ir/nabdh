@@ -403,7 +403,7 @@ export default function ClinicScheduleScreen() {
             ? exceptionStartTime
             : undefined,
         endTime: exceptionMode === 'time_range' ? exceptionEndTime : undefined,
-        reason: exceptionReason.trim() || 'استثناء من العيادة',
+        reason: exceptionReason.trim() || 'استثناء من المركز',
       });
       setExceptionModalVisible(false);
       setExceptionMode('full_day');
@@ -458,13 +458,13 @@ export default function ClinicScheduleScreen() {
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <DoctorHeader
-          title="جدول العيادة"
+          title="جدول المركز"
           icon="calendar-outline"
           centerTitle
-          subtitle="اختر الطبيب ثم عدّل أيام العمل والأوقات والاستثناءات من داخل العيادة."
+          subtitle="اختر المختص ثم عدّل أيام العمل والأوقات والاستثناءات من داخل المركز."
         />
 
-        <DoctorSection title="اختر الطبيب">
+        <DoctorSection title="اختر المختص">
           {doctorsList.length > 0 ? (
             <ScrollView
               horizontal
@@ -495,13 +495,13 @@ export default function ClinicScheduleScreen() {
               })}
             </ScrollView>
           ) : (
-            <Text style={styles.emptyText}>لا يوجد أطباء مقبولون داخل العيادة حالياً.</Text>
+            <Text style={styles.emptyText}>لا يوجد مختصون مقبولون داخل المركز حالياً.</Text>
           )}
         </DoctorSection>
 
         <DoctorSection
           title="الجدول الأسبوعي"
-          subtitle={selectedDoctor ? `تعديل مواعيد ${selectedDoctor.doctorName}` : 'اختر طبيباً أولاً'}
+          subtitle={selectedDoctor ? `تعديل مواعيد ${selectedDoctor.doctorName}` : 'اختر مختصاً أولاً'}
         >
           {selectedDoctor ? (
             <View style={styles.scheduleList}>
@@ -535,7 +535,7 @@ export default function ClinicScheduleScreen() {
                           <Text style={styles.daySummary}>
                             {data.isActive
                               ? `${data.startTime} - ${data.endTime} · ${data.appointmentDurationMinutes} د`
-                              : 'غير ظاهر للمرضى حالياً'}
+                              : 'غير ظاهر للعملاء حالياً'}
                           </Text>
                         </View>
                       </View>
@@ -600,13 +600,13 @@ export default function ClinicScheduleScreen() {
               })}
             </View>
           ) : (
-            <Text style={styles.emptyText}>اختر طبيباً لعرض جدول العمل.</Text>
+            <Text style={styles.emptyText}>اختر مختصاً لعرض جدول العمل.</Text>
           )}
         </DoctorSection>
 
         <DoctorSection
-          title="استثناءات الطبيب"
-          subtitle="إغلاق يوم محدد للطبيب المختار داخل العيادة"
+          title="استثناءات المختص"
+          subtitle="إغلاق يوم محدد للمختص المختار داخل المركز"
           action={
             <Pressable
               onPress={() => setExceptionModalVisible(true)}
@@ -642,7 +642,7 @@ export default function ClinicScheduleScreen() {
                       {formatExceptionSummary(exception)}
                     </Text>
                     <Text style={styles.exceptionReason}>
-                      {exception.reason?.trim() || 'استثناء من العيادة'}
+                      {exception.reason?.trim() || 'استثناء من المركز'}
                     </Text>
                   </View>
                   <Pressable onPress={() => void handleRemoveException(exception._id)}>
@@ -652,7 +652,7 @@ export default function ClinicScheduleScreen() {
               ))}
             </View>
           ) : (
-            <Text style={styles.emptyText}>لا توجد استثناءات للطبيب المختار.</Text>
+            <Text style={styles.emptyText}>لا توجد استثناءات للمختص المختار.</Text>
           )}
         </DoctorSection>
       </ScrollView>
@@ -855,7 +855,7 @@ export default function ClinicScheduleScreen() {
           style={styles.reasonInput}
           value={exceptionReason}
           onChangeText={setExceptionReason}
-          placeholder="مثال: إجازة الطبيب"
+          placeholder="مثال: إجازة المختص"
           placeholderTextColor={theme.colors.textSecondary}
           multiline
           textAlign="right"
