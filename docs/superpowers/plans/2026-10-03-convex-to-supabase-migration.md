@@ -1,6 +1,6 @@
 # Convex + Clerk -> Supabase migration plan
 
-Status: **plan only, nothing applied.** Owner decision (2026-10-03): move the
+Status: **Phase 1 done and applied to Supabase project `nabdh` (`oeexmfgpfotimfsqkntp`, new account, eu-west-1); Phases 2-7 not started.** See "Progress" at the end. Owner decision (2026-10-03): move the
 whole backend from Convex to Supabase, remove Clerk, use Google sign-in with
 no email confirmation, and make first-time onboarding very short for every
 role. The owner was advised that keeping Convex and adding Google sign-in was
@@ -95,3 +95,31 @@ until Phase 7 so rollback is trivial.
 - RLS mistakes leak data across roles. Treat advisors + policy tests as gates.
 - Google-only sign-in excludes users without a Google account (see decision 3).
 - Existing sessions/accounts do not carry over; Clerk users must re-onboard.
+
+## Progress
+
+**Phase 1 - done.** Applied to the `nabdh` project and kept in
+`supabase/migrations/`: schema, RLS + column-level grants, reference data
+(69 wilayas, 9 communes, 22 neutral specialty names), onboarding functions
+(`onboard_patient/doctor/clinic`, Google-name prefill, terms acceptance
+required), `get_available_slots`, `create_booking`, `cancel_booking`,
+`set_booking_status`, `update_booking_doctor_note`. Verified with
+`supabase/tests/booking_flow.sql` (RLS visibility, no double booking,
+privilege-escalation attempts blocked, state machine) and the security
+advisor (only the intended "signed-in users can call this function" notices).
+
+Decisions taken without owner input (all reversible, migrations are plain SQL):
+- Production data not migrated (new empty project, greenfield).
+- Phone is a profile field only; login is Google-only.
+- Dropped `chronicDiseases`, `allergies`, `diagnosisRating`; **kept** booking
+  notes (`booking_notes`) and `doctor_note` to preserve the existing feature.
+
+**Next (Phase 2+), in order:**
+1. Owner: enable the Google provider in Supabase (Authentication -> Providers)
+   with Google Cloud OAuth client IDs; turn off "Confirm email".
+2. Remaining SQL: clinic membership functions (request/invite/accept/reject/
+   cancel/leave/remove), reviews create/reply, booking notes add, doctor/clinic
+   account deletion, favorites toggle, push token upsert, daily summary and
+   cleanup via `pg_cron`, Edge Function for push delivery.
+3. App: Supabase client + Google sign-in + new onboarding screens, replace
+   Convex hooks (~116 call sites in 38 files), then delete Clerk/Convex.
