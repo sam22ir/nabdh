@@ -41,6 +41,7 @@ export default function WelcomeScreen() {
   const [roleLoaded, setRoleLoaded] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
   const [error, setError] = useState('');
+  const [errorDetail, setErrorDetail] = useState('');
 
   useEffect(() => {
     void getStoredAuthRole().then((stored) => {
@@ -73,12 +74,17 @@ export default function WelcomeScreen() {
 
   const handleGoogle = async () => {
     setError('');
+    setErrorDetail('');
     setSigningIn(true);
     try {
       await signInWithGoogle();
     } catch (caught) {
       captureAuthException(caught, { flow: 'google-sign-in', role: selectedRole ?? 'none' });
       setError('تعذر تسجيل الدخول عبر Google. تحقق من اتصالك وحاول مرة أخرى.');
+      // Technical reason (e.g. DEVELOPER_ERROR, 12500) so a failure can be diagnosed.
+      const code = (caught as { code?: string | number })?.code;
+      const message = caught instanceof Error ? caught.message : String(caught);
+      setErrorDetail(`${code !== undefined ? `[${code}] ` : ''}${message}`.slice(0, 240));
     } finally {
       setSigningIn(false);
     }
@@ -128,6 +134,7 @@ export default function WelcomeScreen() {
 
       <View style={styles.actions}>
         {error ? <Text style={styles.error}>{error}</Text> : null}
+        {errorDetail ? <Text style={styles.errorDetail}>{errorDetail}</Text> : null}
         <Pressable
           accessibilityRole="button"
           disabled={!selectedRole || signingIn}
@@ -203,4 +210,5 @@ const styles = StyleSheet.create({
   disabled: { opacity: 0.5 },
   pickHint: { fontFamily: 'Cairo-Regular', color: theme.colors.textSecondary, textAlign: 'center' },
   error: { fontFamily: 'Cairo-Regular', color: theme.colors.danger, textAlign: 'center' },
+  errorDetail: { fontFamily: 'Inter-Regular', fontSize: 12, color: theme.colors.textSecondary, textAlign: 'center' },
 });
